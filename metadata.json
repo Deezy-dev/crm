@@ -1,0 +1,6 @@
+{
+  "name": "OSDEL TECNOLOGIA",
+  "description": "Sistema de Gestão Comercial e Operacional da OSDEL TECNOLOGIA para gestão de clientes, contratos, pagamentos e relatórios de TV a Cabo Comunitária e Internet Fibra em Angola.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
