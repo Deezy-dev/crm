@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 
-type AnyRecord = Record<string, any>;
+export type AnyRecord = Record<string, any>;
 
 const seedClients: AnyRecord[] = [
   {
@@ -232,6 +232,78 @@ const seedSettings: AnyRecord = {
     { id: 'fibra-50', name: 'Fibra 50', speed: '50 Mbps/s', price: 12000 },
     { id: 'fibra-100', name: 'Fibra 100', speed: '100 Mbps/s', price: 20000 },
   ],
+  // Pacotes de TV por Cabo Comunitária
+  tvPackages: [
+    { id: 'tv-basico', name: 'Pacote Básico Comunitário', channelsCount: 35, price: 4000, maxTvs: 1, description: 'Sinal digital RF com canais essenciais (TPA, Zap Viva, Record, SIC, Globo, Desporto).', active: true },
+    { id: 'tv-familia', name: 'Pacote Família Digital', channelsCount: 60, price: 6500, maxTvs: 2, description: 'Canais infantis, novelas, filmes e entretenimento para até 2 televisores.', active: true },
+    { id: 'tv-premium', name: 'Pacote Premium Desporto & Filmes', channelsCount: 90, price: 9500, maxTvs: 2, description: 'Transmissões desportivas ao vivo (Girabola, Premier League, UEFA), cinema e séries HD.', active: true },
+    { id: 'tv-comercial', name: 'Pacote Comercial / Estabelecimentos', channelsCount: 50, price: 15000, maxTvs: 4, description: 'Licença pública para bares, restaurantes e estabelecimentos comerciais.', active: true },
+  ],
+  // Bairros e Zonas de Cobertura
+  coverageNeighborhoods: [
+    { id: 'bairro-1', name: 'Golf I', sector: 'Sector Central & Rua 12', pdosCount: 24, status: 'ativo', notes: 'Sede e centro de transmissão principal' },
+    { id: 'bairro-2', name: 'Golf II', sector: 'Zonas A, B e C', pdosCount: 18, status: 'ativo', notes: 'Alta densidade de clientes fibra e TV' },
+    { id: 'bairro-3', name: 'Palanca', sector: 'Palanca 1 & 2', pdosCount: 16, status: 'ativo', notes: 'Backbone interligado via anel óptico' },
+    { id: 'bairro-4', name: 'Kilamba Kiaxi', sector: 'Sede Municipal', pdosCount: 30, status: 'ativo', notes: 'Infraestrutura com OLT redundante' },
+    { id: 'bairro-5', name: 'Sapú', sector: 'Sapú 1 & 2', pdosCount: 12, status: 'ativo', notes: 'Expansão recente de rede primária' },
+    { id: 'bairro-6', name: 'Rocha Pinto', sector: 'Encosta & Parte Alta', pdosCount: 14, status: 'ativo', notes: 'Rede mista coaxial e fibra FTTH' },
+    { id: 'bairro-7', name: 'Vila Estoril', sector: 'Projecto Novo', pdosCount: 8, status: 'expansao', notes: 'Lançamento de cabos de 48 FO em curso' },
+  ],
+  // Parâmetros de Rede & FTTH
+  oltIp: '10.200.0.1',
+  oltModel: 'Huawei SmartAX EA5800 / ZTE C320 GPON',
+  oltUplinkSpeed: '10 Gbps SFP+',
+  routerOsIp: '10.200.0.254',
+  routerOsApiPort: 8728,
+  dnsPrimary: '1.1.1.1',
+  dnsSecondary: '8.8.8.8',
+  dnsSecondaryAlternative: '208.67.222.222',
+  pppoePoolRange: '100.64.10.1 - 100.64.13.254',
+  publicIpPool: '102.164.x.0/28 (IP Transit Angola Cables)',
+  onuManagementSubnet: '192.168.100.0/24',
+  opticalIdealPowerRx: '-19 dBm',
+  opticalMinPowerRx: '-25 dBm',
+  opticalCriticalPowerRx: '-27 dBm',
+  rfInitialFrequencyMhz: 306,
+  rfModulation: 'DVB-C 256-QAM',
+  rfTargetPowerDbuv: '65 - 75 dBuV',
+  clientCodePrefix: 'CLI-',
+  onuPrefix: 'ONU-',
+  pdoPrefix: 'PDO-',
+  // Políticas de Acordos e Fidelização
+  maxInstallments: 4,
+  minInitialPaymentPercentage: 30,
+  provisionalReconnectionAllowed: true,
+  autoCancelGraceDays: 3,
+  semiannualDiscountPercentage: 5,
+  annualDiscountPercentage: 10,
+  neighborReferralDiscountKz: 1000,
+  // Equipa de Campo & Piquete
+  installationAllowanceKz: 2500,
+  recoveryBonusKz: 1000,
+  maxDailyOrdersPerTeam: 6,
+  fieldWarrantyDays: 30,
+  emergencyResponseHours: 2,
+  dailyToolInspectionRequired: true,
+  // Modelos de Mensagens
+  templateReminderBefore: 'Olá {cliente}, lembramos que a mensalidade do seu serviço OSDEL vence dia {vencimento} no valor de {valor}. Pague por Multicaixa Express ou no nosso balcão para evitar interrupções.',
+  templateDueToday: 'OSDEL: A sua mensalidade de {valor} vence hoje ({vencimento}). Referência de pagamento: {referencia}. IBAN BAI: {iban}. Obrigado pela preferência!',
+  templateCutWarning: 'Aviso OSDEL: O prazo de tolerância expirou. Evite o corte do sinal e a taxa de religação liquidando hoje o valor de {valor}. Apoio: 926 153 736.',
+  templatePaymentConfirmation: 'OSDEL: Confirmamos a recepção do seu pagamento de {valor} referente a {mes}. O seu sinal encontra-se regularizado. Recibo n.º {recibo}.',
+  templateWelcome: 'Bem-vindo à OSDEL Tecnologia, {cliente}! A sua adesão ao serviço ({plano}) foi concluída com sucesso. Apoio técnico: 926 153 736.',
+  // Fiscalidade AGT
+  agtCertificateNumber: 'AGT-CERT/2024/0981',
+  agtSoftwareVersion: 'OSDEL v2.4-AO',
+  fiscalSeries: '2026/A',
+  withholdingTaxRate: 6.5,
+  ivaExemptionReason: 'Regime de Exclusão nos termos do Artigo 12.º do Código do Imposto sobre o Valor Acrescentado (CIVA).',
+  // Segurança & Sessão
+  sessionTimeoutMinutes: 60,
+  minPasswordLength: 6,
+  requireAdminPasswordForDeletions: true,
+  maintenanceMode: false,
+  maxFailedLogins: 5,
+  auditRetentionDays: 365,
 };
 
 export interface JobRole {
@@ -960,11 +1032,324 @@ const seedAuditLogs: AnyRecord[] = [
   },
 ];
 
+const seedFinancialAccounts: AnyRecord[] = [
+  {
+    id: 'acc-caixa',
+    name: 'Caixa Geral (Balcão Golf)',
+    code: 'CX-01',
+    type: 'caixa',
+    initialBalance: 95000,
+    currency: 'AOA',
+    color: 'emerald',
+    manager: 'deezy (Tesouraria)',
+    status: 'active',
+    description: 'Caixa físico da loja de atendimento ao público no Golf II para pagamentos a pronto.',
+  },
+  {
+    id: 'acc-bai',
+    name: 'Banco BAI (Arrecadação Principal)',
+    code: 'BCO-BAI',
+    type: 'banco',
+    bankName: 'Banco Angolano de Investimentos (BAI)',
+    accountNumber: '1234567810',
+    iban: 'AO06.0040.0000.1234.5678.9012.3',
+    initialBalance: 1850000,
+    currency: 'AOA',
+    color: 'blue',
+    manager: 'Administração OSDEL',
+    status: 'active',
+    description: 'Conta principal para recebimentos de mensalidades e depósitos de receita diária.',
+  },
+  {
+    id: 'acc-bfa',
+    name: 'Banco BFA (Operações & Fornecedores)',
+    code: 'BCO-BFA',
+    type: 'banco',
+    bankName: 'Banco de Fomento Angola (BFA)',
+    accountNumber: '9876543210',
+    iban: 'AO06.0006.0000.9876.5432.1098.7',
+    initialBalance: 740000,
+    currency: 'AOA',
+    color: 'amber',
+    manager: 'Administração OSDEL',
+    status: 'active',
+    description: 'Conta para liquidação de fornecedores de fibra, energia e encargos fiscais.',
+  },
+  {
+    id: 'acc-tpa',
+    name: 'Terminal Multicaixa Express (TPA / EMIS)',
+    code: 'TPA-MCX',
+    type: 'tpa',
+    bankName: 'Rede Multicaixa EMIS',
+    accountNumber: 'TPA-98421-MCX',
+    initialBalance: 320000,
+    currency: 'AOA',
+    color: 'purple',
+    manager: 'Operador de Balcão',
+    status: 'active',
+    description: 'Recebimentos com cartões Multicaixa no balcão e pagamentos via Express.',
+  },
+  {
+    id: 'acc-piquete',
+    name: 'Fundo de Maneio de Piquete Técnico',
+    code: 'FM-PIQ',
+    type: 'fundo_maneio',
+    initialBalance: 50000,
+    currency: 'AOA',
+    color: 'cyan',
+    manager: 'Carlos Batalha (Chefe de Piquete)',
+    status: 'active',
+    description: 'Fundo em dinheiro para despesas urgentes de rua, combustível e materiais imediatos.',
+  },
+];
+
+const seedAccountTransfers: AnyRecord[] = [
+  {
+    id: 1,
+    code: 'TRF-2026/0012',
+    date: new Date(Date.now() - 86400000 * 2).toISOString().slice(0, 10),
+    fromAccountId: 'acc-caixa',
+    fromAccountName: 'Caixa Geral (Balcão Golf)',
+    toAccountId: 'acc-bai',
+    toAccountName: 'Banco BAI (Arrecadação Principal)',
+    amount: 150000,
+    reason: 'Sangria de caixa - Depósito de receitas de mensalidades no balcão',
+    proofNumber: 'DEP-BAI-99412',
+    operator: 'deezy',
+    status: 'concluido',
+    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
+  },
+  {
+    id: 2,
+    code: 'TRF-2026/0013',
+    date: new Date(Date.now() - 86400000 * 4).toISOString().slice(0, 10),
+    fromAccountId: 'acc-caixa',
+    fromAccountName: 'Caixa Geral (Balcão Golf)',
+    toAccountId: 'acc-piquete',
+    toAccountName: 'Fundo de Maneio de Piquete Técnico',
+    amount: 30000,
+    reason: 'Reposição semanal de fundo de maneio para viatura de piquete',
+    proofNumber: 'VALE-PIQ-041',
+    operator: 'deezy',
+    status: 'concluido',
+    createdAt: new Date(Date.now() - 86400000 * 4).toISOString(),
+  },
+  {
+    id: 3,
+    code: 'TRF-2026/0014',
+    date: new Date(Date.now() - 86400000 * 7).toISOString().slice(0, 10),
+    fromAccountId: 'acc-bai',
+    fromAccountName: 'Banco BAI (Arrecadação Principal)',
+    toAccountId: 'acc-bfa',
+    toAccountName: 'Banco BFA (Operações & Fornecedores)',
+    amount: 250000,
+    reason: 'Transferência de liquidez para pagamento de lote de bobinas de fibra óptica',
+    proofNumber: 'TRF-INTER-2026',
+    operator: 'admin',
+    status: 'concluido',
+    createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+  },
+];
+
+const seedCategoryBudgets: AnyRecord[] = [
+  { id: 'b-material', category: 'material', label: 'Material de Rede & Fibra', monthlyBudget: 350000, color: 'blue' },
+  { id: 'b-combustivel', category: 'combustivel', label: 'Combustível & Viaturas de Piquete', monthlyBudget: 120000, color: 'amber' },
+  { id: 'b-link_ip', category: 'link_ip', label: 'Link IP Transit & Telecomunicações', monthlyBudget: 600000, color: 'purple' },
+  { id: 'b-alimentacao', category: 'alimentacao', label: 'Alimentação & Diárias de Campo', monthlyBudget: 80000, color: 'rose' },
+  { id: 'b-energia', category: 'energia', label: 'Energia Eléctrica ENDE & Gerador', monthlyBudget: 90000, color: 'emerald' },
+  { id: 'b-manutencao', category: 'manutencao', label: 'Manutenção de Equipamentos & Ferramentas', monthlyBudget: 70000, color: 'indigo' },
+  { id: 'b-operacional', category: 'operacional', label: 'Despesas de Balcão & Consumíveis', monthlyBudget: 50000, color: 'slate' },
+  { id: 'b-impostos', category: 'impostos', label: 'Obrigações Fiscais & Taxas AGT', monthlyBudget: 140000, color: 'cyan' },
+];
+
 const seedExpenses: AnyRecord[] = [
-  { id: 1, date: new Date().toISOString().slice(0, 10), amount: 3500, reason: 'Conectores RG6 e fita isoladora', account: 'Caixa Geral', category: 'material', supplier: 'ElectroGolf Luanda', status: 'pago', operator: 'deezy' },
-  { id: 2, date: new Date(Date.now() - 86400000).toISOString().slice(0, 10), amount: 5000, reason: 'Combustível para carrinha da equipa de piquete', account: 'Caixa Geral', category: 'operacional', supplier: 'Posto Sonangol Golf', status: 'pago', operator: 'deezy' },
-  { id: 3, date: '2024-05-28', amount: 12000, reason: 'Bobina de cabo fibra óptica drop 1FO', account: 'Conta BAI', category: 'material', supplier: 'AngoTelecom Fornecimentos', status: 'pago', operator: 'deezy' },
-  { id: 4, date: new Date().toISOString().slice(0, 10), amount: 8000, reason: 'Alimentação e diárias de campo da equipa técnica', account: 'Caixa Geral', category: 'alimentacao', supplier: 'Restaurante Central', status: 'pago', operator: 'operador1' },
+  {
+    id: 1,
+    date: new Date().toISOString().slice(0, 10),
+    amount: 14500,
+    reason: '100 Conectores SC/APC rápidos e rolo de fita isoladora 3M',
+    account: 'Caixa Geral (Balcão Golf)',
+    accountId: 'acc-caixa',
+    category: 'material',
+    supplier: 'ElectroGolf Luanda Lda',
+    supplierNif: '5417089214',
+    documentNumber: 'FT-2026/0912',
+    paymentMethod: 'Dinheiro',
+    taxWithheld: 0,
+    status: 'pago',
+    isReconciled: true,
+    reconciledAt: new Date().toISOString(),
+    operator: 'deezy',
+    notes: 'Material urgente para ativação de 8 novas portas no Golf II.',
+  },
+  {
+    id: 2,
+    date: new Date(Date.now() - 86400000).toISOString().slice(0, 10),
+    amount: 15000,
+    reason: 'Abastecimento de gasóleo para carrinha Toyota Hilux do piquete',
+    account: 'Fundo de Maneio de Piquete Técnico',
+    accountId: 'acc-piquete',
+    category: 'combustivel',
+    supplier: 'Posto Sonangol Golf II',
+    supplierNif: '5000012391',
+    documentNumber: 'FR-SON-8821',
+    paymentMethod: 'Dinheiro',
+    taxWithheld: 0,
+    status: 'pago',
+    isReconciled: true,
+    reconciledAt: new Date().toISOString(),
+    operator: 'deezy',
+    notes: 'Tanque atestado para rondas noturnas e atendimento de corte de drop.',
+  },
+  {
+    id: 3,
+    date: new Date(Date.now() - 86400000 * 2).toISOString().slice(0, 10),
+    amount: 48000,
+    reason: 'Bobina de cabo drop óptico 1FO auto-sustentado (1000 metros)',
+    account: 'Banco BFA (Operações & Fornecedores)',
+    accountId: 'acc-bfa',
+    category: 'material',
+    supplier: 'AngoTelecom Fornecimentos',
+    supplierNif: '5401928410',
+    documentNumber: 'FAT-2026/4102',
+    paymentMethod: 'Transferência BFA',
+    taxWithheld: 3120,
+    status: 'pago',
+    isReconciled: true,
+    reconciledAt: new Date().toISOString(),
+    operator: 'deezy',
+    notes: 'Aquisição com retenção na fonte de 6.5% aplicada.',
+  },
+  {
+    id: 4,
+    date: new Date(Date.now() - 86400000 * 3).toISOString().slice(0, 10),
+    amount: 12000,
+    reason: 'Almoço e diárias de campo para equipa de instalação técnica externa',
+    account: 'Caixa Geral (Balcão Golf)',
+    accountId: 'acc-caixa',
+    category: 'alimentacao',
+    supplier: 'Restaurante Central Palanca',
+    supplierNif: '5488102391',
+    documentNumber: 'RC-9912',
+    paymentMethod: 'Dinheiro',
+    taxWithheld: 0,
+    status: 'pago',
+    isReconciled: true,
+    reconciledAt: new Date().toISOString(),
+    operator: 'operador1',
+    notes: 'Instalação de backbone na Rua do Povo com 4 técnicos.',
+  },
+  {
+    id: 5,
+    date: new Date(Date.now() - 86400000 * 5).toISOString().slice(0, 10),
+    amount: 185000,
+    reason: 'Banda Larga IP Transit Dedicado STM-1 (Mensalidade Provedor)',
+    account: 'Banco BAI (Arrecadação Principal)',
+    accountId: 'acc-bai',
+    category: 'link_ip',
+    supplier: 'MSTelcom Angola',
+    supplierNif: '5400019281',
+    documentNumber: 'FAT-MST/2026/09',
+    paymentMethod: 'Transferência BAI',
+    taxWithheld: 12025,
+    status: 'pago',
+    isReconciled: true,
+    reconciledAt: new Date().toISOString(),
+    operator: 'admin',
+    notes: 'Conexão primária de fibra óptica da cabeceira OSDEL.',
+  },
+  {
+    id: 6,
+    date: new Date(Date.now() - 86400000 * 6).toISOString().slice(0, 10),
+    amount: 25000,
+    reason: 'Recarga pré-paga ENDE para Estação de Cabeceira e Transmissores CATV',
+    account: 'Terminal Multicaixa Express (TPA / EMIS)',
+    accountId: 'acc-tpa',
+    category: 'energia',
+    supplier: 'ENDE EP - Luanda Sul',
+    supplierNif: '5400192812',
+    documentNumber: 'REC-ENDE-41092',
+    paymentMethod: 'Multicaixa Express',
+    taxWithheld: 0,
+    status: 'pago',
+    isReconciled: true,
+    reconciledAt: new Date().toISOString(),
+    operator: 'deezy',
+    notes: 'Carregamento de 2.100 kWh para o quadro trifásico do rack.',
+  },
+  {
+    id: 7,
+    date: new Date(Date.now() - 86400000 * 8).toISOString().slice(0, 10),
+    amount: 32000,
+    reason: 'Calibração e lâminas novas para clivador de precisão e máquina de fusão',
+    account: 'Banco BFA (Operações & Fornecedores)',
+    accountId: 'acc-bfa',
+    category: 'manutencao',
+    supplier: 'FiberTech Angola',
+    supplierNif: '5411902812',
+    documentNumber: 'FT-FT/2026/012',
+    paymentMethod: 'Transferência BFA',
+    taxWithheld: 2080,
+    status: 'pago',
+    isReconciled: false,
+    operator: 'deezy',
+    notes: 'Revisão técnica semestral do equipamento de fusão Fujikura.',
+  },
+  {
+    id: 8,
+    date: new Date(Date.now() - 86400000 * 10).toISOString().slice(0, 10),
+    amount: 8500,
+    reason: 'Rolos de papel térmico para TPA e resmas de papel timbrado A4',
+    account: 'Caixa Geral (Balcão Golf)',
+    accountId: 'acc-caixa',
+    category: 'operacional',
+    supplier: 'Papelaria Moderna Luanda',
+    supplierNif: '5422819201',
+    documentNumber: 'FR-PAP-2026',
+    paymentMethod: 'Dinheiro',
+    taxWithheld: 0,
+    status: 'pago',
+    isReconciled: true,
+    reconciledAt: new Date().toISOString(),
+    operator: 'operador1',
+    notes: 'Material para emissão de facturas-recibos físicas aos clientes.',
+  },
+  {
+    id: 9,
+    date: new Date(Date.now() - 86400000 * 12).toISOString().slice(0, 10),
+    amount: 45000,
+    reason: 'Taxa de licenciamento municipal de cabos aéreos e postes',
+    account: 'Banco BAI (Arrecadação Principal)',
+    accountId: 'acc-bai',
+    category: 'impostos',
+    supplier: 'Administração Municipal do Kilamba Kiaxi',
+    supplierNif: '5000192810',
+    documentNumber: 'DUC-2026/0491',
+    paymentMethod: 'Transferência BAI',
+    taxWithheld: 0,
+    status: 'pago',
+    isReconciled: false,
+    operator: 'admin',
+    notes: 'Guia DUC liquidada referente à ocupação de via aérea no Golf II.',
+  },
+  {
+    id: 10,
+    date: new Date(Date.now() + 86400000 * 2).toISOString().slice(0, 10),
+    amount: 65000,
+    reason: 'Aquisição agendada de 4 novas Caixas CTO 16FO com Splitter 1:16',
+    account: 'Banco BFA (Operações & Fornecedores)',
+    accountId: 'acc-bfa',
+    category: 'material',
+    supplier: 'ElectroGolf Luanda Lda',
+    supplierNif: '5417089214',
+    documentNumber: 'ORC-2026/881',
+    paymentMethod: 'Transferência BFA',
+    taxWithheld: 0,
+    status: 'pendente',
+    isReconciled: false,
+    operator: 'deezy',
+    notes: 'Expansão planeada para o setor Palanca / Rua 15.',
+  },
 ];
 
 const seedMessages: AnyRecord[] = [
@@ -1228,6 +1613,9 @@ let contracts = load('contracts', seedContracts);
 let settings = load('settings', seedSettings);
 let users = load('users', seedUsers);
 let expenses = load('expenses', seedExpenses);
+let financialAccounts = load('financial_accounts', seedFinancialAccounts);
+let accountTransfers = load('account_transfers', seedAccountTransfers);
+let categoryBudgets = load('category_budgets', seedCategoryBudgets);
 let messages = load('messages', seedMessages);
 let inventory = load('inventory', seedInventory);
 let equipmentAssignments = load('equipment_assignments', seedEquipmentAssignments);
@@ -1284,6 +1672,10 @@ export const getListClientsQueryKey = (params: AnyRecord = {}) =>
 export const getListClientContractsQueryKey = (id: number) => key('contracts', id);
 export const getListPaymentsQueryKey = () => key('payments');
 export const getListExpensesQueryKey = () => key('expenses');
+export const getListFinancialAccountsQueryKey = () => key('financial_accounts');
+export const getListTransfersQueryKey = (params: AnyRecord = {}) =>
+  key('account_transfers', params.startDate || '', params.endDate || '');
+export const getListCategoryBudgetsQueryKey = () => key('category_budgets');
 export const getListUsersQueryKey = () => key('users');
 export const getListMessagesQueryKey = () => key('messages');
 export const getListInventoryQueryKey = (params: AnyRecord = {}) =>
@@ -1466,10 +1858,39 @@ export const useListPayments = (params: AnyRecord = {}) =>
 
 export const useListExpenses = (params: AnyRecord = {}) =>
   query(getListExpensesQueryKey(), () => {
+    const needle = String(params.search || '').toLowerCase().trim();
     const items = expenses
-      .filter((e) => isInRange(e.date, params.startDate, params.endDate))
+      .filter((e) => {
+        if (!isInRange(e.date, params.startDate, params.endDate)) return false;
+        if (params.category && e.category !== params.category) return false;
+        if (params.account && e.account !== params.account && e.accountId !== params.account) return false;
+        if (params.status && e.status !== params.status) return false;
+        if (needle) {
+          const hay = `${e.reason} ${e.supplier || ''} ${e.documentNumber || ''} ${e.operator || ''}`.toLowerCase();
+          if (!hay.includes(needle)) return false;
+        }
+        return true;
+      })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     return Object.assign([...items], { items, total: items.length });
+  });
+
+export const useListFinancialAccounts = () =>
+  query(getListFinancialAccountsQueryKey(), () => {
+    return Object.assign([...financialAccounts], { items: financialAccounts, total: financialAccounts.length });
+  });
+
+export const useListTransfers = (params: AnyRecord = {}) =>
+  query(getListTransfersQueryKey(params), () => {
+    const list = accountTransfers
+      .filter((t) => isInRange(t.date, params.startDate, params.endDate))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return Object.assign([...list], { items: list, total: list.length });
+  });
+
+export const useListCategoryBudgets = () =>
+  query(getListCategoryBudgetsQueryKey(), () => {
+    return Object.assign([...categoryBudgets], { items: categoryBudgets, total: categoryBudgets.length });
   });
 
 export const useListUsers = () =>
@@ -2132,6 +2553,137 @@ export const useDeleteExpense = () =>
     return true;
   });
 
+export const useUpdateExpense = () =>
+  mutation(({ expenseId, data }) => {
+    const sessionUser = session();
+    expenses = expenses.map((e) =>
+      e.id === expenseId
+        ? {
+            ...e,
+            ...data,
+            updatedAt: new Date().toISOString(),
+          }
+        : e,
+    );
+    save('expenses', expenses);
+    logAuditAction({
+      action: 'ACTUALIZAR_DESPESA',
+      module: 'Contabilidade',
+      description: `Atualizada despesa EXP-${expenseId}: ${data.reason || ''}`,
+      targetId: `EXP-${expenseId}`,
+      user: sessionUser?.username || 'operador',
+    });
+    return expenses.find((e) => e.id === expenseId);
+  });
+
+export const useCreateTransfer = () =>
+  mutation(({ data }) => {
+    const sessionUser = session();
+    const nextId = Math.max(0, ...accountTransfers.map((t) => t.id)) + 1;
+    const item = {
+      ...data,
+      id: nextId,
+      code: data.code || `TRF-${new Date().getFullYear()}/${String(nextId).padStart(4, '0')}`,
+      date: data.date || new Date().toISOString().slice(0, 10),
+      createdAt: new Date().toISOString(),
+      operator: sessionUser?.username || 'deezy',
+      status: data.status || 'concluido',
+    };
+    accountTransfers = [item, ...accountTransfers];
+    save('account_transfers', accountTransfers);
+    logAuditAction({
+      action: 'TRANSFERENCIA_CONTAS',
+      module: 'Tesouraria',
+      description: `Transferência de ${money(item.amount)} de ${item.fromAccountName} para ${item.toAccountName}`,
+      targetId: item.code,
+      user: sessionUser?.username || 'operador',
+    });
+    return item;
+  });
+
+export const useDeleteTransfer = () =>
+  mutation(({ transferId }) => {
+    accountTransfers = accountTransfers.filter((t) => t.id !== transferId);
+    save('account_transfers', accountTransfers);
+    return true;
+  });
+
+export const useCreateFinancialAccount = () =>
+  mutation(({ data }) => {
+    const sessionUser = session();
+    const id = data.id || `acc-${Date.now()}`;
+    const item = {
+      ...data,
+      id,
+      initialBalance: Number(data.initialBalance || 0),
+      status: 'active',
+      createdAt: new Date().toISOString(),
+    };
+    financialAccounts = [...financialAccounts, item];
+    save('financial_accounts', financialAccounts);
+    logAuditAction({
+      action: 'CRIAR_CONTA_FINANCEIRA',
+      module: 'Tesouraria',
+      description: `Criada conta ${item.name} (${item.type})`,
+      targetId: item.id,
+      user: sessionUser?.username || 'operador',
+    });
+    return item;
+  });
+
+export const useUpdateFinancialAccount = () =>
+  mutation(({ accountId, data }) => {
+    financialAccounts = financialAccounts.map((a) =>
+      a.id === accountId ? { ...a, ...data } : a,
+    );
+    save('financial_accounts', financialAccounts);
+    return financialAccounts.find((a) => a.id === accountId);
+  });
+
+export const useDeleteFinancialAccount = () =>
+  mutation(({ accountId }) => {
+    financialAccounts = financialAccounts.filter((a) => a.id !== accountId);
+    save('financial_accounts', financialAccounts);
+    return true;
+  });
+
+export const useUpdateCategoryBudgets = () =>
+  mutation(({ data }) => {
+    categoryBudgets = data;
+    save('category_budgets', categoryBudgets);
+    return categoryBudgets;
+  });
+
+export const useToggleExpenseReconciliation = () =>
+  mutation(({ expenseId, reconciled }) => {
+    expenses = expenses.map((e) =>
+      e.id === expenseId
+        ? {
+            ...e,
+            isReconciled: reconciled,
+            reconciledAt: reconciled ? new Date().toISOString() : null,
+          }
+        : e,
+    );
+    save('expenses', expenses);
+    return true;
+  });
+
+export const useTogglePaymentReconciliation = () =>
+  mutation(({ paymentId, reconciled }) => {
+    payments = payments.map((p) =>
+      p.id === paymentId
+        ? {
+            ...p,
+            isReconciled: reconciled,
+            reconciledAt: reconciled ? new Date().toISOString() : null,
+          }
+        : p,
+    );
+    save('payments', payments);
+    return true;
+  });
+
 // Inventory Mutations
 export const useCreateInventoryItem = () =>
   mutation(({ data }) => {
@@ -2328,7 +2880,7 @@ export const useDeleteServiceOrder = () =>
 // Database Backup and Restore
 export const exportDatabaseJson = () => {
   const fullBackup = {
-    version: '2.0',
+    version: '2.5',
     exportedAt: new Date().toISOString(),
     clients,
     payments,
@@ -2336,10 +2888,16 @@ export const exportDatabaseJson = () => {
     settings,
     users,
     expenses,
+    financialAccounts,
+    accountTransfers,
+    categoryBudgets,
     messages,
     inventory,
     equipmentAssignments,
     serviceOrders,
+    cashClosures,
+    invoices,
+    auditLogs,
   };
   return JSON.stringify(fullBackup, null, 2);
 };
@@ -2371,6 +2929,18 @@ export const importDatabaseJson = (jsonString: string) => {
       expenses = data.expenses;
       save('expenses', expenses);
     }
+    if (data.financialAccounts && Array.isArray(data.financialAccounts)) {
+      financialAccounts = data.financialAccounts;
+      save('financial_accounts', financialAccounts);
+    }
+    if (data.accountTransfers && Array.isArray(data.accountTransfers)) {
+      accountTransfers = data.accountTransfers;
+      save('account_transfers', accountTransfers);
+    }
+    if (data.categoryBudgets && Array.isArray(data.categoryBudgets)) {
+      categoryBudgets = data.categoryBudgets;
+      save('category_budgets', categoryBudgets);
+    }
     if (data.messages && Array.isArray(data.messages)) {
       messages = data.messages;
       save('messages', messages);
@@ -2387,6 +2957,18 @@ export const importDatabaseJson = (jsonString: string) => {
       serviceOrders = data.serviceOrders;
       save('service_orders', serviceOrders);
     }
+    if (data.cashClosures && Array.isArray(data.cashClosures)) {
+      cashClosures = data.cashClosures;
+      save('cash_closures', cashClosures);
+    }
+    if (data.invoices && Array.isArray(data.invoices)) {
+      invoices = data.invoices;
+      save('invoices', invoices);
+    }
+    if (data.auditLogs && Array.isArray(data.auditLogs)) {
+      auditLogs = data.auditLogs;
+      save('audit_logs', auditLogs);
+    }
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message || 'Ficheiro JSON inválido' };
@@ -2400,6 +2982,9 @@ export const resetDatabaseToDefaults = () => {
   settings = seedSettings;
   users = seedUsers;
   expenses = seedExpenses;
+  financialAccounts = seedFinancialAccounts;
+  accountTransfers = seedAccountTransfers;
+  categoryBudgets = seedCategoryBudgets;
   messages = seedMessages;
   inventory = seedInventory;
   equipmentAssignments = seedEquipmentAssignments;
@@ -2411,6 +2996,9 @@ export const resetDatabaseToDefaults = () => {
   save('settings', settings);
   save('users', users);
   save('expenses', expenses);
+  save('financial_accounts', financialAccounts);
+  save('account_transfers', accountTransfers);
+  save('category_budgets', categoryBudgets);
   save('messages', messages);
   save('inventory', inventory);
   save('equipment_assignments', equipmentAssignments);

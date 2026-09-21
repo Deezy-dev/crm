@@ -45,11 +45,13 @@ import {
   type CashClosure,
 } from '@/lib/local-api';
 import { Button, Field, Input, Select, Textarea, Badge, Status, Modal, PageHeader, kz, date, dateTime } from '@/components/shared-ui';
+import { useToast } from '@/hooks/use-toast';
 import { MonthlyClosuresView } from '@/components/monthly-closures-view';
 import { getMonthlyClosures } from '@/lib/monthly-closures';
 
 export function AccountingPage() {
   const qc = useQueryClient();
+  const { toast } = useToast();
   const currentUser = session();
   const isAdmin = currentUser?.role === 'admin';
 
@@ -57,6 +59,7 @@ export function AccountingPage() {
   const [period, setPeriod] = useState<'month' | 'today' | 'all'>('month');
   const [modalExpense, setModalExpense] = useState(false);
   const [modalClosurePreview, setModalClosurePreview] = useState<CashClosure | null>(null);
+  const [homologateModal, setHomologateModal] = useState<{ id: number; notes: string } | null>(null);
 
   const monthlyClosures = getMonthlyClosures();
 
@@ -268,35 +271,64 @@ export function AccountingPage() {
       {
         onSuccess: (newClosure) => {
           qc.invalidateQueries({ queryKey: getListCashClosuresQueryKey() });
-          alert('Fecho de Caixa e Turno registado com sucesso!');
+          toast({
+            title: 'Fecho Registado',
+            description: 'Fecho de Caixa e Turno registado com sucesso!',
+          });
           setActiveTab('historico');
           setModalClosurePreview(newClosure);
         },
         onError: (err: any) => {
-          alert(err.message || 'Erro ao registrar fecho de caixa.');
+          toast({
+            title: 'Erro no Registo',
+            description: err.message || 'Erro ao registar fecho de caixa.',
+            variant: 'destructive',
+          });
         },
       },
     );
   };
 
-  const handleHomologateClosure = (closureId: number) => {
+  const openHomologateModal = (closureId: number) => {
     if (!isAdmin) {
-      alert('Apenas o Administrador pode homologar/validar o fecho de caixa.');
+      toast({
+        title: 'Acesso Restrito',
+        description: 'Apenas o Administrador pode homologar o fecho de caixa.',
+        variant: 'destructive',
+      });
       return;
     }
-    const adminNotes = prompt('Notas ou Parecer de Homologação da Administração:') || 'Conferido e homologado pela Direcção.';
+    setHomologateModal({
+      id: closureId,
+      notes: 'Conferido e homologado pela Direcção Financeira.',
+    });
+  };
+
+  const confirmHomologateClosure = () => {
+    if (!homologateModal) return;
     validateCashClosure.mutate(
       {
-        closureId,
-        adminNotes,
+        closureId: homologateModal.id,
+        adminNotes: homologateModal.notes || 'Conferido e homologado pela Direcção.',
       },
       {
         onSuccess: () => {
           qc.invalidateQueries({ queryKey: getListCashClosuresQueryKey() });
-          alert('Fecho de caixa validado e homologado com sucesso!');
-          if (modalClosurePreview && modalClosurePreview.id === closureId) {
+          toast({
+            title: 'Fecho Homologado',
+            description: 'Fecho de caixa validado e homologado com sucesso!',
+          });
+          if (modalClosurePreview && modalClosurePreview.id === homologateModal.id) {
             setModalClosurePreview(null);
           }
+          setHomologateModal(null);
+        },
+        onError: (err: any) => {
+          toast({
+            title: 'Erro ao Homologar',
+            description: err.message || 'Ocorreu um erro ao homologar o fecho.',
+            variant: 'destructive',
+          });
         },
       },
     );
@@ -915,7 +947,7 @@ export function AccountingPage() {
                             {isAdmin && c.status !== 'validado' && (
                               <Button
                                 className="text-xs py-1 px-2.5 bg-emerald-700 text-white hover:bg-emerald-800"
-                                onClick={() => handleHomologateClosure(c.id)}
+                                onClick={() => openHomologateModal(c.id)}
                               >
                                 <Check size={13} /> Homologar
                               </Button>
@@ -1202,7 +1234,7 @@ export function AccountingPage() {
                 {isAdmin && modalClosurePreview.status !== 'validado' && (
                   <Button
                     className="bg-emerald-700 text-white hover:bg-emerald-800"
-                    onClick={() => handleHomologateClosure(modalClosurePreview.id)}
+                    onClick={() => openHomologateModal(modalClosurePreview.id)}
                   >
                     <Check size={15} /> Validar / Homologar
                   </Button>
@@ -1211,6 +1243,40 @@ export function AccountingPage() {
                   Fechar
                 </Button>
               </div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* MODAL: HOMOLOGAÇÃO FORMAL DA ADMINISTRAÇÃO */}
+      {homologateModal && (
+        <Modal
+          title="Homologar Fecho de Caixa"
+          eyebrow="Validação de Direcção"
+          onClose={() => setHomologateModal(null)}
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-[hsl(var(--muted-foreground))]">
+              Ao homologar, o fecho de caixa diário nº <strong>FC-{String(homologateModal.id).padStart(5, '0')}</strong> será marcado como conferido e auditado formalmente pela administração.
+            </p>
+            <Field label="Notas ou Parecer da Administração">
+              <Textarea
+                value={homologateModal.notes}
+                onChange={(e) => setHomologateModal({ ...homologateModal, notes: e.target.value })}
+                rows={3}
+                placeholder="Insira as notas de auditoria..."
+              />
+            </Field>
+            <div className="flex justify-end gap-2 pt-2 border-t border-[hsl(var(--border))]">
+              <Button variant="outline" onClick={() => setHomologateModal(null)}>
+                Cancelar
+              </Button>
+              <Button
+                className="bg-emerald-700 text-white hover:bg-emerald-800"
+                onClick={confirmHomologateClosure}
+              >
+                <Check size={15} /> Confirmar Homologação
+              </Button>
             </div>
           </div>
         </Modal>
