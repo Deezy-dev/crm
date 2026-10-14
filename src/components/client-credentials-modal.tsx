@@ -17,6 +17,7 @@ import {
   type ClientCredentials,
 } from '@/lib/client-auth';
 import { getCompanyLogo } from '@/lib/company-logo';
+import { triggerPrint } from '@/lib/printer';
 
 interface ClientCredentialsModalProps {
   client: any;
@@ -73,13 +74,13 @@ export function ClientCredentialsModal({ client, onClose }: ClientCredentialsMod
   };
 
   const handlePrint = () => {
-    window.print();
+    triggerPrint({ elementId: 'printable-credentials-card' });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#142f35]/50 p-4 backdrop-blur-sm">
-      <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[hsl(var(--card))] shadow-2xl border border-[hsl(var(--border))]">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--card)/.98)] px-6 py-4 backdrop-blur">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#142f35]/50 p-4 backdrop-blur-sm printable-modal-overlay print:static print:p-0 print:bg-white print:z-auto print:block">
+      <div className="max-h-[92dvh] w-full max-w-lg overflow-y-auto rounded-2xl bg-[hsl(var(--card))] shadow-2xl border border-[hsl(var(--border))] modal-printable-container print:max-w-none print:shadow-none print:border-none print:p-0 print:overflow-visible">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--card)/.98)] px-6 py-4 backdrop-blur print:hidden">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center">
               <Smartphone size={22} />
@@ -97,9 +98,9 @@ export function ClientCredentialsModal({ client, onClose }: ClientCredentialsMod
           </button>
         </header>
 
-        <div className="p-6 space-y-6">
+        <div className="p-6 space-y-6 print:p-0">
           {/* Printable Credentials Card */}
-          <div className="credentials-print-card relative overflow-hidden rounded-2xl border-2 border-blue-500/40 bg-gradient-to-br from-slate-900 to-blue-950 p-6 text-white shadow-xl">
+          <div id="printable-credentials-card" className="credentials-print-card relative overflow-hidden rounded-2xl border-2 border-blue-500/40 bg-gradient-to-br from-slate-900 to-blue-950 p-6 text-white shadow-xl">
             <div className="flex items-center justify-between border-b border-white/15 pb-4">
               <div className="flex items-center gap-3">
                 <img
@@ -150,10 +151,10 @@ export function ClientCredentialsModal({ client, onClose }: ClientCredentialsMod
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5 print:hidden">
             <button
               onClick={handleCopy}
-              className="flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))] transition"
+              className="flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--secondary))] transition cursor-pointer"
             >
               {copied ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
               {copied ? 'Copiado!' : 'Copiar Dados'}
@@ -161,27 +162,27 @@ export function ClientCredentialsModal({ client, onClose }: ClientCredentialsMod
 
             <button
               onClick={handleWhatsApp}
-              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white px-4 py-2.5 text-xs font-bold hover:bg-emerald-500 transition shadow-sm"
+              className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white px-4 py-2.5 text-xs font-bold hover:bg-emerald-500 transition shadow-sm cursor-pointer"
             >
               <Share2 size={15} /> Enviar WhatsApp
             </button>
 
             <button
               onClick={handlePrint}
-              className="flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition"
+              className="flex items-center justify-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--secondary))] px-4 py-2.5 text-xs font-bold text-[hsl(var(--foreground))] hover:bg-[hsl(var(--muted))] transition cursor-pointer"
             >
               <Printer size={15} /> Imprimir Cartão
             </button>
 
             <button
               onClick={handleRegenerate}
-              className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 text-rose-600 hover:bg-rose-500/10 px-4 py-2.5 text-xs font-bold transition"
+              className="flex items-center justify-center gap-2 rounded-xl border border-rose-500/30 text-rose-600 hover:bg-rose-500/10 px-4 py-2.5 text-xs font-bold transition cursor-pointer"
             >
               <RefreshCw size={15} /> Gerar Novo PIN
             </button>
           </div>
 
-          <div className="rounded-xl bg-[hsl(var(--secondary)/.6)] p-3.5 text-xs text-[hsl(var(--muted-foreground))] space-y-1">
+          <div className="rounded-xl bg-[hsl(var(--secondary)/.6)] p-3.5 text-xs text-[hsl(var(--muted-foreground))] space-y-1 print:hidden">
             <p className="font-bold text-[hsl(var(--foreground))]">Como o cliente entra no aplicativo:</p>
             <p>1. O cliente abre o APK no seu telemóvel Android.</p>
             <p>2. Insere o código do contrato (<b>{client.code}</b>) ou o seu número de telefone.</p>

@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="pt-AO">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão X · Desktop</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- Custom Titlebar (Window Drag & Controls) -->
+  <header class="titlebar">
+    <div class="titlebar-brand">
+      <span class="logo-dot"></span>
+      <span>Gestão X · Software de Gestão de Telecomunicações</span>
+    </div>
+    <div class="window-controls">
+      <button class="win-btn" id="btn-win-min" title="Minimizar">&#x2212;</button>
+      <button class="win-btn" id="btn-win-max" title="Maximizar">&#x25A2;</button>
+      <button class="win-btn close" id="btn-win-close" title="Fechar">&#x2715;</button>
+    </div>
+  </header>
+
+  <!-- Login Screen Overlay -->
+  <div class="login-screen" id="login-screen">
+    <div class="login-card">
+      <div class="login-logo">GX</div>
+      <h2>Gestão X · Desktop</h2>
+      <p>Acesse com as suas credenciais de operador ou administrador</p>
+      
+      <div class="login-error" id="login-error"></div>
+
+      <form class="login-form" id="login-form">
+        <div class="form-group">
+          <label>URL do Servidor / API</label>
+          <input type="text" id="login-api-url" class="form-control" placeholder="http://127.0.0.1:5000" value="http://127.0.0.1:5000">
+        </div>
+        <div class="form-group">
+          <label>Nome de Usuário</label>
+          <input type="text" id="login-username" class="form-control" placeholder="Ex: admin" value="admin" required>
+        </div>
+        <div class="form-group">
+          <label>Palavra-passe</label>
+          <input type="password" id="login-password" class="form-control" placeholder="••••••••" value="admin123" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="btn-login-submit" style="margin-top: 10px; width: 100%; padding: 10px;">
+          Entrar no Sistema
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Main Layout -->
+  <div class="app-container" id="app-container" style="display: none;">
+    
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <div class="brand-icon">GX</div>
+        <div class="brand-details">
+          <h1>Gestão X</h1>
+          <p>Operação & Comercial</p>
+        </div>
+      </div>
+
+      <!-- API Online/Offline Indicator -->
+      <div class="api-status-pill" id="api-status-pill" title="Clique para testar conexão">
+        <div class="indicator">
+          <span class="status-dot online" id="api-status-dot"></span>
+          <span id="api-status-text">API Online</span>
+        </div>
+        <span class="status-latency" id="api-latency-text">-- ms</span>
+      </div>
+
+      <!-- Nav Menu -->
+      <ul class="nav-menu">
+        <li class="nav-item active" data-view="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          <span>Dashboard</span>
+        </li>
+        <li class="nav-item" data-view="clients">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span>Clientes</span>
+        </li>
+        <li class="nav-item" data-view="budgets">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          <span>Orçamentos</span>
+        </li>
+        <li class="nav-item" data-view="invoices">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+          <span>Faturas & Cobrança</span>
+        </li>
+        <li class="nav-item" data-view="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Configurações</span>
+        </li>
+      </ul>
+
+      <!-- User footer -->
+      <div class="sidebar-footer">
+        <div class="user-badge">
+          <div class="user-avatar" id="sidebar-user-avatar">A</div>
+          <div class="user-info">
+            <span class="user-name" id="sidebar-user-name">Administrador</span>
+            <span class="user-role" id="sidebar-user-role">admin</span>
+          </div>
+        </div>
+        <button class="btn-logout" id="btn-logout" title="Terminar sessão">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-wrapper">
+      
+      <!-- Top Bar -->
+      <div class="top-bar">
+        <div class="page-title-area">
+          <h2 id="top-title">Visão Geral</h2>
+          <p id="top-subtitle">Resumo operacional e métricas em tempo real</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-secondary btn-sm" id="btn-refresh-data" title="Recarregar dados">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.19"/></svg>
+            <span>Atualizar</span>
+          </button>
+          <button class="btn btn-primary btn-sm" id="btn-top-new-client">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>Novo Cliente</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Content Views -->
+      <div class="content-area">
+        
+        <!-- ============================================================= -->
+        <!-- VIEW 1: DASHBOARD -->
+        <!-- ============================================================= -->
+        <section class="view-panel active" id="view-dashboard">
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span class="stat-title">Total de Clientes</span>
+                <div class="stat-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </div>
+              </div>
+              <div class="stat-value" id="dash-total-clients">0</div>
+              <div class="stat-subtext" id="dash-clients-breakdown">TV: 0 · Fibra: 0 · Combo: 0</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span class="stat-title">Clientes Ativos</span>
+                <div class="stat-icon" style="color: var(--success); background: var(--success-bg);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+              </div>
+              <div class="stat-value" id="dash-active-clients">0</div>
+              <div class="stat-subtext" style="color: var(--success);">Serviço regularizado</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span class="stat-title">Inadimplentes / Atrasados</span>
+                <div class="stat-icon" style="color: var(--warning); background: var(--warning-bg);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+              </div>
+              <div class="stat-value" id="dash-late-clients">0</div>
+              <div class="stat-subtext" id="dash-suspended-subtext">Suspensos: 0</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-card-header">
+                <span class="stat-title">Faturamento Recebido</span>
+                <div class="stat-icon" style="color: #38bdf8; background: var(--primary-light);">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                </div>
+              </div>
+              <div class="stat-value" id="dash-revenue">0 Kz</div>
+              <div class="stat-subtext" id="dash-pending-revenue">A receber: 0 Kz</div>
+            </div>
+          </div>
+
+          <!-- Tabelas Rápidas no Dashboard -->
+          <div class="table-card">
+            <div class="table-header-bar">
+              <h3 style="font-size: 14px; font-weight: 600;">Últimos Clientes Cadastrados</h3>
+              <button class="btn btn-secondary btn-sm" id="btn-dash-view-all-clients">Ver Todos</button>
+            </div>
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Nome Completo</th>
+                  <th>Telefone</th>
+                  <th>Bairro</th>
+                  <th>Serviço</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="dash-recent-clients-tbody">
+                <tr><td colspan="6" style="text-align: center; color: var(--text-subtle);">Carregando dados...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 2: CLIENTES -->
+        <!-- ============================================================= -->
+        <section class="view-panel" id="view-clients">
+          <div class="table-card">
+            <div class="table-header-bar">
+              <div class="filter-group">
+                <div class="search-box">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                  <input type="text" id="clients-search" placeholder="Pesquisar por nome, telefone, código...">
+                </div>
+                <select class="select-filter" id="clients-filter-status">
+                  <option value="todos">Todos os Status</option>
+                  <option value="active">Ativos</option>
+                  <option value="late">Atrasados</option>
+                  <option value="suspended">Suspensos</option>
+                  <option value="inactive">Inativos</option>
+                </select>
+                <select class="select-filter" id="clients-filter-service">
+                  <option value="todos">Todos os Serviços</option>
+                  <option value="tv">TV por Cabo</option>
+                  <option value="fibra">Internet Fibra</option>
+                  <option value="combo">Combo TV + Fibra</option>
+                </select>
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-client-new">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Cadastrar Cliente</span>
+              </button>
+            </div>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Nome do Cliente</th>
+                  <th>Telefone</th>
+                  <th>Bairro / Cidade</th>
+                  <th>Serviço</th>
+                  <th>Mensalidade</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="clients-tbody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-subtle);">Carregando clientes...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 3: ORÇAMENTOS -->
+        <!-- ============================================================= -->
+        <section class="view-panel" id="view-budgets">
+          <div class="table-card">
+            <div class="table-header-bar">
+              <div class="filter-group">
+                <select class="select-filter" id="budgets-filter-status">
+                  <option value="todos">Todos os Status</option>
+                  <option value="pendente">Pendentes</option>
+                  <option value="aprovado">Aprovados</option>
+                  <option value="rejeitado">Rejeitados</option>
+                  <option value="convertido">Convertidos</option>
+                </select>
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-budget-new">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Novo Orçamento</span>
+              </button>
+            </div>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Número</th>
+                  <th>Cliente</th>
+                  <th>Serviço</th>
+                  <th>Descrição</th>
+                  <th>Total Líquido</th>
+                  <th>Validade</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="budgets-tbody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-subtle);">Carregando orçamentos...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 4: FATURAS & COBRANÇA -->
+        <!-- ============================================================= -->
+        <section class="view-panel" id="view-invoices">
+          <div class="table-card">
+            <div class="table-header-bar">
+              <div class="filter-group">
+                <select class="select-filter" id="invoices-filter-status">
+                  <option value="todos">Todos os Status</option>
+                  <option value="pendente">Pendentes</option>
+                  <option value="paga">Pagas</option>
+                  <option value="vencida">Vencidas</option>
+                </select>
+              </div>
+              <button class="btn btn-primary btn-sm" id="btn-invoice-new">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>Emitir Fatura</span>
+              </button>
+            </div>
+
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Fatura #</th>
+                  <th>Cliente</th>
+                  <th>Valor Base</th>
+                  <th>Multa</th>
+                  <th>Total a Pagar</th>
+                  <th>Vencimento</th>
+                  <th>Status</th>
+                  <th style="text-align: right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="invoices-tbody">
+                <tr><td colspan="8" style="text-align: center; color: var(--text-subtle);">Carregando faturas...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- ============================================================= -->
+        <!-- VIEW 5: CONFIGURAÇÕES -->
+        <!-- ============================================================= -->
+        <section class="view-panel" id="view-settings">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            
+            <!-- Conexão API -->
+            <div class="table-card" style="padding: 24px;">
+              <h3 style="font-size: 15px; margin-bottom: 8px;">Conexão com a API (PythonAnywhere / Local)</h3>
+              <p style="font-size: 12px; color: var(--text-subtle); margin-bottom: 20px;">
+                Configure a URL da API Flask para sincronizar dados em tempo real.
+              </p>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label>URL Base da API</label>
+                <input type="text" id="settings-api-url" class="form-control" placeholder="https://seu_usuario.pythonanywhere.com">
+                <span style="font-size: 11px; color: var(--text-subtle);">Ex: https://albertombuyizola.pythonanywhere.com ou http://127.0.0.1:5000</span>
+              </div>
+
+              <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" id="btn-save-api-url">Salvar Configuração</button>
+                <button class="btn btn-secondary" id="btn-test-connection">Testar Conexão</button>
+              </div>
+            </div>
+
+            <!-- Informações do Usuário e Cache -->
+            <div class="table-card" style="padding: 24px;">
+              <h3 style="font-size: 15px; margin-bottom: 8px;">Perfil do Operador & Sessão</h3>
+              <p style="font-size: 12px; color: var(--text-subtle); margin-bottom: 20px;">
+                Informações da conta autenticada no Gestão X Desktop.
+              </p>
+
+              <div style="display: flex; flex-direction: column; gap: 10px; font-size: 13px; margin-bottom: 24px;">
+                <div><strong>Nome Completo:</strong> <span id="settings-user-fullname">--</span></div>
+                <div><strong>Nome de Usuário:</strong> <span id="settings-user-username">--</span></div>
+                <div><strong>Email:</strong> <span id="settings-user-email">--</span></div>
+                <div><strong>Função / Nível:</strong> <span id="settings-user-role" class="badge badge-active">admin</span></div>
+              </div>
+
+              <button class="btn btn-secondary" id="btn-clear-cache">Limpar Cache Local Offline</button>
+            </div>
+
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- ================================================================= -->
+  <!-- MODAIS -->
+  <!-- ================================================================= -->
+
+  <!-- Modal Cliente (Novo / Edição) -->
+  <div class="modal-overlay" id="modal-client">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-client-title">Cadastrar Novo Cliente</h3>
+        <button class="modal-close" data-close-modal="modal-client">&times;</button>
+      </div>
+      <form id="form-client">
+        <input type="hidden" id="client-id">
+        <div class="modal-body">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Nome Completo *</label>
+              <input type="text" id="client-full-name" class="form-control" required placeholder="Ex: Manuel António">
+            </div>
+            <div class="form-group">
+              <label>Telefone Principal *</label>
+              <input type="text" id="client-phone" class="form-control" required placeholder="+244 923 000 000">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Telefone Alternativo</label>
+              <input type="text" id="client-alt-phone" class="form-control" placeholder="+244 991 000 000">
+            </div>
+            <div class="form-group">
+              <label>Email</label>
+              <input type="email" id="client-email" class="form-control" placeholder="cliente@email.com">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Bairro</label>
+              <input type="text" id="client-neighborhood" class="form-control" placeholder="Golf I, Palanca, etc.">
+            </div>
+            <div class="form-group">
+              <label>Cidade</label>
+              <input type="text" id="client-city" class="form-control" value="Luanda">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Tipo de Serviço *</label>
+              <select id="client-service-type" class="form-control">
+                <option value="tv">TV por Cabo Comunitária</option>
+                <option value="fibra">Internet Fibra Óptica</option>
+                <option value="combo" selected>Combo (TV + Fibra)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mensalidade (Kz) *</label>
+              <input type="number" id="client-monthly-fee" class="form-control" value="5000" required>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Status do Cliente</label>
+              <select id="client-status" class="form-control">
+                <option value="active" selected>Ativo (Regular)</option>
+                <option value="late">Atrasado</option>
+                <option value="suspended">Suspenso</option>
+                <option value="inactive">Inativo</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Nº BI / Documento</label>
+              <input type="text" id="client-doc" class="form-control" placeholder="004829104LA041">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Código da Casa / Bloco</label>
+              <input type="text" id="client-house-code" class="form-control" placeholder="Ex: C-42B">
+            </div>
+            <div class="form-group">
+              <label>Caixa PDO / Poste</label>
+              <input type="text" id="client-pdo" class="form-control" placeholder="PDO-04">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Notas / Observações</label>
+            <textarea id="client-notes" class="form-control" rows="2" placeholder="Informações de acesso ou observações técnicas..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-client">Cancelar</button>
+          <button type="submit" class="btn btn-primary" id="btn-save-client">Salvar Cliente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Orçamento -->
+  <div class="modal-overlay" id="modal-budget">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Emitir Novo Orçamento</h3>
+        <button class="modal-close" data-close-modal="modal-budget">&times;</button>
+      </div>
+      <form id="form-budget">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Nome do Cliente / Prospecto *</label>
+            <input type="text" id="budget-client-name" class="form-control" required placeholder="Ex: João da Silva">
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Serviço Proposto</label>
+              <select id="budget-service-type" class="form-control">
+                <option value="fibra">Instalação de Fibra Óptica</option>
+                <option value="tv">Instalação de TV por Cabo</option>
+                <option value="combo">Pacote Combo Completo</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Validade da Proposta (Dias)</label>
+              <input type="number" id="budget-validity" class="form-control" value="15">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Valor dos Materiais / Mão de Obra (Kz) *</label>
+              <input type="number" id="budget-total-amount" class="form-control" value="25000" required>
+            </div>
+            <div class="form-group">
+              <label>Desconto Comercial (Kz)</label>
+              <input type="number" id="budget-discount" class="form-control" value="0">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Descrição Detalhada do Orçamento *</label>
+            <textarea id="budget-desc" class="form-control" rows="3" required placeholder="Fornecimento de drop óptico 100m, conectorização SC/APC, ativação de ONU..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-budget">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Gerar Orçamento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Fatura -->
+  <div class="modal-overlay" id="modal-invoice">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Emitir Fatura / Mensalidade</h3>
+        <button class="modal-close" data-close-modal="modal-invoice">&times;</button>
+      </div>
+      <form id="form-invoice">
+        <div class="modal-body">
+          <div class="form-group">
+            <label>Cliente *</label>
+            <select id="invoice-client-select" class="form-control" required>
+              <option value="">Selecione um cliente...</option>
+            </select>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Valor da Mensalidade (Kz) *</label>
+              <input type="number" id="invoice-amount" class="form-control" value="5000" required>
+            </div>
+            <div class="form-group">
+              <label>Multa por Atraso (Kz)</label>
+              <input type="number" id="invoice-penalty" class="form-control" value="0">
+            </div>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Data de Vencimento *</label>
+              <input type="date" id="invoice-due-date" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label>Status Inicial</label>
+              <select id="invoice-status" class="form-control">
+                <option value="pendente" selected>Pendente</option>
+                <option value="paga">Paga</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-invoice">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Emitir Fatura</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Registrar Pagamento -->
+  <div class="modal-overlay" id="modal-payment">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3>Registrar Pagamento</h3>
+        <button class="modal-close" data-close-modal="modal-payment">&times;</button>
+      </div>
+      <form id="form-payment">
+        <input type="hidden" id="pay-invoice-id">
+        <div class="modal-body">
+          <p id="pay-invoice-desc" style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;"></p>
+          <div class="form-group">
+            <label>Método de Pagamento *</label>
+            <select id="pay-method" class="form-control">
+              <option value="multicaixa">Multicaixa Express</option>
+              <option value="transferencia">Transferência Bancária</option>
+              <option value="dinheiro">Dinheiro Físico / Caixa</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Código de Referência / Comprovativo</label>
+            <input type="text" id="pay-ref" class="form-control" placeholder="Ex: MCX-948201">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close-modal="modal-payment">Cancelar</button>
+          <button type="submit" class="btn btn-primary" style="background: var(--success); border-color: var(--success);">Confirmar Recebimento</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Container de Toasts -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="js/api.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -49,8 +49,10 @@ import {
   serviceLabel,
 } from '@/components/shared-ui';
 import { MonthlyClosuresView } from '@/components/monthly-closures-view';
+import { useServiceMode } from '@/lib/service-mode';
 
 export function ReportsAdvancedPage() {
+  const { mode, meta } = useServiceMode();
   const currentSession = session();
   const isAdmin = currentSession?.role === 'admin';
 
@@ -72,10 +74,10 @@ export function ReportsAdvancedPage() {
   const [modalPrint, setModalPrint] = useState(false);
 
   // Queries
-  const clientsQuery = useListClients();
-  const paymentsQuery = useListPayments();
+  const clientsQuery = useListClients({ serviceMode: mode || undefined });
+  const paymentsQuery = useListPayments({ serviceMode: mode || undefined });
   const expensesQuery = useListExpenses();
-  const serviceOrdersQuery = useListServiceOrders();
+  const serviceOrdersQuery = useListServiceOrders({ serviceMode: mode || undefined });
   const usersQuery = useListUsers();
   const settingsQuery = useGetSettings();
 
@@ -305,9 +307,9 @@ export function ReportsAdvancedPage() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Auditoria, Desempenho & Facturação"
-        title="Relatórios & Business Intelligence"
-        detail="Auditoria executiva dos movimentos financeiros, índice de pontualidade por PDO, desempenho de caixa por operador e métricas técnicas de campo."
+        eyebrow={`Auditoria & Finanças · Modo ${meta.shortName}`}
+        title={`Relatórios & Business Intelligence (${meta.shortName})`}
+        detail={`Auditoria executiva dos movimentos financeiros de ${meta.name}, índice de adimplência, desempenho de caixa por operador e métricas técnicas de campo.`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={exportToCSV}>

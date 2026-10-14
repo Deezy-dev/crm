@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { enqueueSyncMutation } from '@/lib/offline-sync';
 
 export type AnyRecord = Record<string, any>;
 
@@ -1664,30 +1665,31 @@ export type ExpenseInput = AnyRecord;
 export type UserInput = AnyRecord;
 export type MessageInput = AnyRecord;
 
-export const getGetDashboardQueryKey = () => key('dashboard');
+export const getGetDashboardQueryKey = (serviceMode = '') => key('dashboard', serviceMode);
 export const getGetClientQueryKey = (id: number) => key('client', id);
 export const getGetSettingsQueryKey = () => key('settings');
 export const getListClientsQueryKey = (params: AnyRecord = {}) =>
-  key('clients', params.search || '', params.serviceType || '', params.status || '');
+  key('clients', params.search || '', params.serviceType || '', params.status || '', params.serviceMode || '');
 export const getListClientContractsQueryKey = (id: number) => key('contracts', id);
-export const getListPaymentsQueryKey = () => key('payments');
+export const getListPaymentsQueryKey = (params: AnyRecord = {}) =>
+  key('payments', params.paymentMonth || '', params.serviceMode || '', params.serviceType || '');
 export const getListExpensesQueryKey = () => key('expenses');
 export const getListFinancialAccountsQueryKey = () => key('financial_accounts');
 export const getListTransfersQueryKey = (params: AnyRecord = {}) =>
   key('account_transfers', params.startDate || '', params.endDate || '');
 export const getListCategoryBudgetsQueryKey = () => key('category_budgets');
 export const getListUsersQueryKey = () => key('users');
-export const getListMessagesQueryKey = () => key('messages');
+export const getListMessagesQueryKey = (params: AnyRecord = {}) => key('messages', params.serviceMode || '');
 export const getListInventoryQueryKey = (params: AnyRecord = {}) =>
-  key('inventory', params.category || '', params.search || '');
-export const getListEquipmentAssignmentsQueryKey = (clientId?: number) =>
-  key('equipment_assignments', clientId || 0);
+  key('inventory', params.category || '', params.search || '', params.serviceMode || '');
+export const getListEquipmentAssignmentsQueryKey = (clientId?: number, serviceMode?: string) =>
+  key('equipment_assignments', clientId || 0, serviceMode || '');
 export const getListServiceOrdersQueryKey = (params: AnyRecord = {}) =>
-  key('service_orders', params.status || '', params.type || '', params.clientId || 0);
+  key('service_orders', params.status || '', params.type || '', params.clientId || 0, params.serviceMode || '');
 export const getListJobRolesQueryKey = () => key('job_roles');
 export const getListCashClosuresQueryKey = () => key('cash_closures');
 export const getListInvoicesQueryKey = (params: AnyRecord = {}) =>
-  key('invoices', params.search || '', params.status || '', params.period || '');
+  key('invoices', params.search || '', params.status || '', params.period || '', params.serviceMode || '');
 export const getListAuditLogsQueryKey = (params: AnyRecord = {}) =>
   key('audit_logs', params.module || '', params.user || '', params.search || '');
 export const useHealthCheck = () => ({ isError: false, data: { status: 'ok' } });
@@ -1753,23 +1755,49 @@ export const visibleClient = (client: AnyRecord): AnyRecord => {
 const isInRange = (value: string, start?: string, end?: string) =>
   (!start || value >= start) && (!end || value <= end);
 
-export const useGetDashboard = () =>
+export const useGetDashboard = (serviceMode = '') =>
   query(
-    getGetDashboardQueryKey(),
+    getGetDashboardQueryKey(serviceMode),
     () => {
-      const listed = clients.map(visibleClient);
+      let listed = clients.map(visibleClient);
+      if (serviceMode === 'fibra') {
+        listed = listed.filter((c) => c.serviceType === 'internet');
+      } else if (serviceMode === 'tv') {
+        listed = listed.filter((c) => c.serviceType === 'tv');
+      }
+
+      const allowedClientIds = new Set(listed.map((c) => c.id));
       const currentMonth = monthKey();
-      const currentMonthPayments = payments.filter((p) => p.paymentMonth === currentMonth);
+      const currentMonthPayments = payments.filter((p) => p.paymentMonth === currentMonth && (serviceMode === 'ambos' || !serviceMode || allowedClientIds.has(p.clientId)));
       const paidClientsIds = new Set(currentMonthPayments.map((p) => p.clientId));
       const revenue = currentMonthPayments.reduce(
         (sum, p) => sum + Number(p.amount) + Number(p.penalty || 0),
         0,
       );
 
-      const lowStockItems = inventory.filter((i) => Number(i.quantity) <= Number(i.minQuantity)).length;
-      const pendingServiceOrders = serviceOrders.filter(
+      const filteredInventory = inventory.filter((i) => {
+        if (serviceMode === 'fibra') {
+          return i.category === 'fibra' || i.category === 'equipamento' || (i.name && i.name.toLowerCase().includes('fibra'));
+        }
+        if (serviceMode === 'tv') {
+          return i.category === 'tv' || (i.name && (i.name.toLowerCase().includes('tv') || i.name.toLowerCase().includes('coaxial') || i.name.toLowerCase().includes('rg6')));
+        }
+        return true;
+      });
+      const lowStockItems = filteredInventory.filter((i) => Number(i.quantity) <= Number(i.minQuantity)).length;
+
+      const filteredServiceOrders = serviceOrders.filter((o) => {
+        if (!serviceMode || serviceMode === 'ambos') return true;
+        return allowedClientIds.has(o.clientId);
+      });
+      const pendingServiceOrders = filteredServiceOrders.filter(
         (o) => o.status === 'pendente' || o.status === 'em_curso',
       ).length;
+
+      const filteredPaymentsForActivity = payments.filter((p) => {
+        if (!serviceMode || serviceMode === 'ambos') return true;
+        return allowedClientIds.has(p.clientId);
+      });
 
       return {
         totalClients: listed.length,
@@ -1783,12 +1811,12 @@ export const useGetDashboard = () =>
         revenue,
         paidClients: paidClientsIds.size,
         unpaidClients: Math.max(0, listed.length - paidClientsIds.size),
-        openRequests: clients.filter((c) => String(c.notes || '').toLowerCase().includes('pedido')).length,
+        openRequests: listed.filter((c) => String(c.notes || '').toLowerCase().includes('pedido')).length,
         lowStockItems,
         pendingServiceOrders,
         month: currentMonth,
         recentActivity: [
-          ...payments.map((p) => ({
+          ...filteredPaymentsForActivity.map((p) => ({
             id: `pay-${p.id}`,
             description: `Pagamento de ${money(Number(p.amount) + Number(p.penalty || 0))} de ${
               clients.find((c) => c.id === p.clientId)?.fullName || 'Cliente'
@@ -1797,7 +1825,7 @@ export const useGetDashboard = () =>
             method: p.method,
             type: 'payment',
           })),
-          ...serviceOrders.map((so) => ({
+          ...filteredServiceOrders.map((so) => ({
             id: `so-${so.id}`,
             description: `O.S. ${so.code} (${so.type}) - ${
               clients.find((c) => c.id === so.clientId)?.fullName || 'Cliente'
@@ -1834,7 +1862,16 @@ export const useListClients = (params: AnyRecord = {}) =>
           c.houseCode || ''
         } ${c.address} ${c.neighborhood || ''}`.toLowerCase();
         const matchesSearch = !needle || text.includes(needle);
-        const matchesService = !params.serviceType || c.serviceType === params.serviceType;
+
+        let matchesService = true;
+        if (params.serviceMode === 'fibra') {
+          matchesService = c.serviceType === 'internet';
+        } else if (params.serviceMode === 'tv') {
+          matchesService = c.serviceType === 'tv';
+        } else if (params.serviceType) {
+          matchesService = c.serviceType === params.serviceType;
+        }
+
         const matchesStatus =
           !params.status ||
           c.status === params.status ||
@@ -1849,11 +1886,20 @@ export const useListClientContracts = (id: number, options?: AnyRecord) =>
   query(getListClientContractsQueryKey(id), () => contracts.filter((c) => c.clientId === id), options?.query);
 
 export const useListPayments = (params: AnyRecord = {}) =>
-  query(getListPaymentsQueryKey(), () => {
-    const items = payments
+  query(getListPaymentsQueryKey(params), () => {
+    let items = payments;
+    if (params.serviceMode === 'fibra' || params.serviceType === 'internet') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'internet').map((c) => c.id));
+      items = items.filter((p) => allowed.has(p.clientId));
+    } else if (params.serviceMode === 'tv' || params.serviceType === 'tv') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'tv').map((c) => c.id));
+      items = items.filter((p) => allowed.has(p.clientId));
+    }
+
+    const filtered = items
       .filter((p) => !params.paymentMonth || p.paymentMonth === params.paymentMonth)
       .sort((a, b) => new Date(b.paidAt).getTime() - new Date(a.paidAt).getTime());
-    return Object.assign([...items], { items, total: items.length });
+    return Object.assign([...filtered], { items: filtered, total: filtered.length });
   });
 
 export const useListExpenses = (params: AnyRecord = {}) =>
@@ -1899,16 +1945,60 @@ export const useListUsers = () =>
     return Object.assign([...active], { items: active, total: active.length });
   });
 
-export const useListMessages = () =>
-  query(getListMessagesQueryKey(), () => {
-    const list = messages.slice().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    return Object.assign([...list], { items: list, total: list.length });
+export const useListMessages = (params: AnyRecord = {}) =>
+  query(getListMessagesQueryKey(params), () => {
+    let list = messages.slice();
+    if (params.serviceMode === 'fibra') {
+      list = list.filter((m) => {
+        const text = `${m.audience || ''} ${m.message || ''}`.toLowerCase();
+        return !text.includes('tv a cabo') && !text.includes('cabo comunit');
+      });
+    } else if (params.serviceMode === 'tv') {
+      list = list.filter((m) => {
+        const text = `${m.audience || ''} ${m.message || ''}`.toLowerCase();
+        return !text.includes('fibra') && !text.includes('onu') && !text.includes('pdo');
+      });
+    }
+    const sorted = list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return Object.assign([...sorted], { items: sorted, total: sorted.length });
   });
 
 export const useListInventory = (params: AnyRecord = {}) =>
   query(getListInventoryQueryKey(params), () => {
     const needle = String(params.search || '').toLowerCase().trim();
-    const list = inventory
+    let list = inventory;
+    if (params.serviceMode === 'fibra') {
+      list = list.filter((item) => {
+        const cat = (item.category || '').toLowerCase();
+        const name = (item.name || '').toLowerCase();
+        return (
+          cat === 'fibra' ||
+          cat === 'equipamento' ||
+          name.includes('fibra') ||
+          name.includes('drop') ||
+          name.includes('onu') ||
+          name.includes('sc/apc') ||
+          name.includes('pdo') ||
+          name.includes('roteador')
+        );
+      });
+    } else if (params.serviceMode === 'tv') {
+      list = list.filter((item) => {
+        const cat = (item.category || '').toLowerCase();
+        const name = (item.name || '').toLowerCase();
+        return (
+          cat === 'tv' ||
+          name.includes('tv') ||
+          name.includes('coaxial') ||
+          name.includes('rg6') ||
+          name.includes('conector f') ||
+          name.includes('splitter') ||
+          name.includes('repartidor')
+        );
+      });
+    }
+
+    const filtered = list
       .filter((item) => {
         const matchesCategory = !params.category || item.category === params.category;
         const text = `${item.code} ${item.name} ${item.description} ${item.location}`.toLowerCase();
@@ -1916,20 +2006,39 @@ export const useListInventory = (params: AnyRecord = {}) =>
         return matchesCategory && matchesSearch;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-    return Object.assign([...list], { items: list, total: list.length });
+    return Object.assign([...filtered], { items: filtered, total: filtered.length });
   });
 
-export const useListEquipmentAssignments = (clientId?: number) =>
-  query(getListEquipmentAssignmentsQueryKey(clientId), () => {
-    const list = equipmentAssignments.slice();
+export const useListEquipmentAssignments = (params?: number | { clientId?: number; serviceMode?: string }) => {
+  const clientId = typeof params === 'number' ? params : params?.clientId;
+  const serviceMode = typeof params === 'object' ? params?.serviceMode : undefined;
+  return query(getListEquipmentAssignmentsQueryKey(clientId, serviceMode), () => {
+    let list = equipmentAssignments.slice();
+    if (serviceMode === 'fibra') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'internet' || c.serviceType === 'combo').map((c) => c.id));
+      list = list.filter((eq) => allowed.has(eq.clientId));
+    } else if (serviceMode === 'tv') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'tv').map((c) => c.id));
+      list = list.filter((eq) => allowed.has(eq.clientId));
+    }
     const filtered = clientId ? list.filter((eq) => eq.clientId === clientId) : list;
     const sorted = filtered.sort((a, b) => new Date(b.installedAt || '').getTime() - new Date(a.installedAt || '').getTime());
     return Object.assign([...sorted], { items: sorted, total: sorted.length });
   });
+};
 
 export const useListServiceOrders = (params: AnyRecord = {}) =>
   query(getListServiceOrdersQueryKey(params), () => {
-    const sorted = serviceOrders
+    let list = serviceOrders;
+    if (params.serviceMode === 'fibra') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'internet').map((c) => c.id));
+      list = list.filter((so) => allowed.has(so.clientId));
+    } else if (params.serviceMode === 'tv') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'tv').map((c) => c.id));
+      list = list.filter((so) => allowed.has(so.clientId));
+    }
+
+    const sorted = list
       .filter((so) => {
         const matchesStatus = !params.status || so.status === params.status;
         const matchesType = !params.type || so.type === params.type;
@@ -1956,7 +2065,16 @@ export const useListCashClosures = () =>
 export const useListInvoices = (params: AnyRecord = {}) =>
   query(getListInvoicesQueryKey(params), () => {
     const needle = (params.search || '').toLowerCase().trim();
-    const sorted = invoices
+    let list = invoices;
+    if (params.serviceMode === 'fibra') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'internet').map((c) => c.id));
+      list = list.filter((inv) => !inv.clientId || allowed.has(inv.clientId));
+    } else if (params.serviceMode === 'tv') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'tv').map((c) => c.id));
+      list = list.filter((inv) => !inv.clientId || allowed.has(inv.clientId));
+    }
+
+    const sorted = list
       .filter((inv) => {
         const matchesStatus = !params.status || inv.status === params.status;
         const text = `${inv.invoiceNumber} ${inv.clientName} ${inv.clientDocument || ''} ${inv.paymentMethod || ''}`.toLowerCase();
@@ -1983,13 +2101,27 @@ export const useListAuditLogs = (params: AnyRecord = {}) =>
   });
 
 export const useGetReports = (params: AnyRecord) =>
-  query(key('reports', params.reportType, params.startDate, params.endDate), () => {
-    const ps = payments.filter((p) => isInRange(p.paidAt.slice(0, 10), params.startDate, params.endDate));
+  query(key('reports', params.reportType, params.startDate, params.endDate, params.serviceMode || ''), () => {
+    let ps = payments.filter((p) => isInRange(p.paidAt.slice(0, 10), params.startDate, params.endDate));
+    if (params.serviceMode === 'fibra') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'internet').map((c) => c.id));
+      ps = ps.filter((p) => allowed.has(p.clientId));
+    } else if (params.serviceMode === 'tv') {
+      const allowed = new Set(clients.filter((c) => c.serviceType === 'tv').map((c) => c.id));
+      ps = ps.filter((p) => allowed.has(p.clientId));
+    }
+
     const es = expenses.filter((e) => isInRange(e.date, params.startDate, params.endDate));
 
     const totalReceita = ps.reduce((s, p) => s + Number(p.amount) + Number(p.penalty || 0), 0);
     const totalSaidas = es.reduce((s, e) => s + Number(e.amount), 0);
     const totalResto = totalReceita - totalSaidas;
+
+    const relevantClients = clients.filter((c) => {
+      if (params.serviceMode === 'fibra') return c.serviceType === 'internet';
+      if (params.serviceMode === 'tv') return c.serviceType === 'tv';
+      return true;
+    });
 
     const dates = Array.from(
       new Set([...ps.map((p) => p.paidAt.slice(0, 10)), ...es.map((e) => e.date)]),
@@ -2026,7 +2158,7 @@ export const useGetReports = (params: AnyRecord) =>
         receita_total: totalReceita,
         saidas: totalSaidas,
         resto: totalResto,
-        clientes: clients.length,
+        clientes: relevantClients.length,
       },
       rows,
     };
@@ -2088,6 +2220,14 @@ export const useCreateClient = () =>
     contracts = [newContract, ...contracts];
     save('contracts', contracts);
 
+    enqueueSyncMutation({
+      module: 'clientes',
+      action: 'create',
+      entity: 'Cliente',
+      description: `Registo de cliente: ${newClient.fullName} (${code})`,
+      payload: newClient,
+    });
+
     return { client: newClient, contract: newContract };
   });
 
@@ -2095,6 +2235,13 @@ export const useUpdateClient = () =>
   mutation(({ clientId, data }) => {
     clients = clients.map((c) => (c.id === clientId ? { ...c, ...data } : c));
     save('clients', clients);
+    enqueueSyncMutation({
+      module: 'clientes',
+      action: 'update',
+      entity: 'Cliente',
+      description: `Actualização de dados do cliente #${clientId}`,
+      payload: { clientId, ...data },
+    });
     return clients.find((c) => c.id === clientId);
   });
 
@@ -2135,6 +2282,15 @@ export const useCreatePayment = () =>
     clients = clients.map((c) => (c.id === Number(data.clientId) ? { ...c, status: 'active' } : c));
     save('payments', payments);
     save('clients', clients);
+
+    enqueueSyncMutation({
+      module: 'pagamentos',
+      action: 'create',
+      entity: 'Pagamento',
+      description: `Pagamento recebido: ${item.amount} Kz (Cliente #${data.clientId})`,
+      payload: item,
+    });
+
     return item;
   });
 
@@ -2151,6 +2307,13 @@ export const useUpdateSettings = () =>
       module: 'Definições',
       description: 'Alterações efetuadas nas definições da empresa e parâmetros comerciais.',
       user: sessionUser?.username || 'admin',
+    });
+    enqueueSyncMutation({
+      module: 'configuracoes',
+      action: 'update',
+      entity: 'Definições Globais',
+      description: 'Alteração dos parâmetros da empresa e preços dos planos',
+      payload: data,
     });
     return settings;
   });
@@ -2172,6 +2335,13 @@ export const useCreateExpense = () =>
       description: `Registada despesa de ${money(item.amount)}: ${item.reason}`,
       targetId: `EXP-${item.id}`,
       user: sessionUser?.username || 'operador',
+    });
+    enqueueSyncMutation({
+      module: 'despesas',
+      action: 'create',
+      entity: 'Despesa / Saída',
+      description: `Saída de caixa de ${item.amount} Kz: ${item.reason}`,
+      payload: item,
     });
     return item;
   });
@@ -2749,6 +2919,15 @@ export const useAdjustInventoryStock = () =>
         save('expenses', expenses);
       }
     }
+
+    enqueueSyncMutation({
+      module: 'inventario',
+      action: 'update',
+      entity: 'Inventário / Stock',
+      description: `Ajuste de stock: ${delta > 0 ? '+' : ''}${delta} unidades (Item #${itemId})`,
+      payload: { itemId, delta, reason },
+    });
+
     return inventory.find((i) => i.id === itemId);
   });
 
@@ -2796,6 +2975,14 @@ export const useAssignEquipment = () =>
       save('clients', clients);
     }
 
+    enqueueSyncMutation({
+      module: 'inventario',
+      action: 'create',
+      entity: 'Atribuição de Equipamento',
+      description: `Equipamento ${item.equipmentType} (${item.serialNumber || 'S/N'}) atribuído ao Cliente #${data.clientId}`,
+      payload: item,
+    });
+
     return item;
   });
 
@@ -2836,6 +3023,15 @@ export const useCreateServiceOrder = () =>
 
     serviceOrders = [item, ...serviceOrders];
     save('service_orders', serviceOrders);
+
+    enqueueSyncMutation({
+      module: 'ordens',
+      action: 'create',
+      entity: 'Ordem de Serviço',
+      description: `Nova OS gerada: ${code} (${item.type || 'Intervenção'})`,
+      payload: item,
+    });
+
     return item;
   });
 
@@ -2867,6 +3063,15 @@ export const useUpdateServiceOrder = () =>
     });
 
     save('service_orders', serviceOrders);
+
+    enqueueSyncMutation({
+      module: 'ordens',
+      action: 'update',
+      entity: 'Ordem de Serviço',
+      description: `OS #${orderId} actualizada (Estado: ${data.status || 'actualizado'})`,
+      payload: { orderId, ...data },
+    });
+
     return serviceOrders.find((so) => so.id === orderId);
   });
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { Link, Route, Router as WouterRouter, Switch, useLocation, useParams } from 'wouter';
-import { AlertCircle, ArrowDownRight, ArrowUpRight, Banknote, Bell, BriefcaseBusiness, Calculator, Calendar, Check, ChevronRight, CircleDollarSign, ClipboardList, Database, FilePenLine, FileSignature, FileText, Globe2, LayoutDashboard, LogOut, Menu, MessageSquare, Package, Palette, Plus, Printer, ReceiptText, RefreshCw, Save, Search, Send, Settings, ShieldCheck, Smartphone, Trash2, UserRound, Users, Wifi, Wrench, X } from 'lucide-react';
+import { AlertCircle, ArrowDownRight, ArrowRightLeft, ArrowUpRight, Banknote, Bell, BriefcaseBusiness, Calculator, Calendar, Check, ChevronRight, CircleDollarSign, ClipboardList, Database, FilePenLine, FileSignature, FileText, Globe2, LayoutDashboard, Layers, LogOut, Menu, MessageSquare, Package, Palette, Plus, Printer, ReceiptText, RefreshCw, Save, Search, Send, Settings, ShieldCheck, Smartphone, Trash2, Tv, UserRound, Users, Wifi, Wrench, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -21,6 +21,12 @@ import { ReportsAdvancedPage } from '@/pages/reports-advanced';
 import { SchedulePage } from '@/pages/schedule-page';
 import { TeamMissionsPage } from '@/pages/team-missions-page';
 import { AccountsPage } from '@/pages/accounts-page';
+import { PrintPage } from '@/pages/print-page';
+import { ServiceSelectionPage } from '@/pages/service-selection-page';
+import { ServiceModeSwitcher } from '@/components/service-mode-switcher';
+import { useServiceMode, getStoredServiceMode } from '@/lib/service-mode';
+import { SoftwareLicensingPage } from '@/pages/software-licensing';
+import { useTenants } from '@/hooks/use-tenants';
 import NotFound from '@/pages/not-found';
 
 const queryClient = new QueryClient();
@@ -41,6 +47,7 @@ const nav = [
   { label: 'Equipa', href: '/equipe', icon: Users },
   { label: 'Contabilidade & Fecho', href: '/contabilidade', icon: Calculator },
   { label: 'Perfil', href: '/perfil', icon: UserRound },
+  { label: 'Licenciamento', href: '/gestao-x-licencas', icon: ShieldCheck },
   { label: 'Definições', href: '/administracao', icon: Settings },
 ];
 
@@ -71,6 +78,10 @@ function Empty({ title, detail, action }: { title: string; detail: string; actio
 import { getCompanyLogo } from '@/lib/company-logo';
 import { getUnreadCount } from '@/lib/notifications';
 import { NotificationsModal } from '@/components/notifications-modal';
+import { SyncStatusPill } from '@/components/sync-status-pill';
+import { OfflineBanner } from '@/components/offline-banner';
+import { PWAInstallButton } from '@/components/pwa-install-button';
+
 
 function Shell({ children }: { children: ReactNode }) {
   const [location, setLocation] = useLocation();
@@ -78,8 +89,10 @@ function Shell({ children }: { children: ReactNode }) {
   const [notices, setNotices] = useState(false);
   const [unreadNotices, setUnreadNotices] = useState(() => getUnreadCount());
   const [currentLogo, setCurrentLogo] = useState(() => getCompanyLogo());
+  const { activeTenant } = useTenants();
   const health = useHealthCheck();
   const user = session();
+  const { mode, meta } = useServiceMode();
   const current =
     nav.find((item) => item.href === location)?.label ||
     (location.startsWith('/clientes/') ? 'Clientes' : 'Centro de operações');
@@ -103,33 +116,54 @@ function Shell({ children }: { children: ReactNode }) {
         }`}
       >
         <div className="flex items-center justify-between px-2">
-          <Link href="/" data-testid="link-brand" className="flex items-center gap-3">
-            <img
-              src={currentLogo}
-              alt="OSDEL"
-              className="h-10 w-10 rounded-full border border-[hsl(var(--sidebar-border))] bg-white p-0.5 object-contain"
-            />
+          <Link href="/" data-testid="link-brand" className="flex items-center gap-3 group">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 border border-slate-700/60 text-white shadow-xs font-serif text-lg font-bold">
+              GX
+            </div>
             <div>
-              <div className="font-serif text-xl leading-none">OSDEL</div>
-              <div className="mt-1 text-[9px] font-bold uppercase tracking-[.2em] text-[hsl(var(--sidebar-foreground)/.52)]">
-                tecnologia
+              <div className="font-serif text-xl font-bold tracking-tight text-[hsl(var(--sidebar-foreground))]">
+                Gestão X
+              </div>
+              <div className="text-[10px] font-medium text-[hsl(var(--sidebar-foreground)/.5)]">
+                {activeTenant?.tradingName || 'OSDEL Tecnologia'}
               </div>
             </div>
           </Link>
           <button
             aria-label="Fechar menu"
             onClick={() => setOpen(false)}
-            className="rounded-lg p-2 lg:hidden"
+            className="rounded-lg p-2 lg:hidden text-[hsl(var(--sidebar-foreground)/.6)] hover:text-white"
           >
             <X size={18} />
           </button>
         </div>
 
-        <div className="mt-7 px-2 text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--sidebar-foreground)/.42)]">
+        {/* Modalidade de Trabalho */}
+        <div className="mt-4 px-2">
+          <Link
+            href="/selecionar-servico"
+            title="Alterar modalidade de serviço (Fibra / TV Cabo / Ambos)"
+            className="flex items-center justify-between rounded-xl px-2.5 py-2 text-xs font-semibold border border-[hsl(var(--sidebar-border))] bg-[hsl(var(--sidebar-accent)/.4)] text-[hsl(var(--sidebar-foreground))] hover:bg-[hsl(var(--sidebar-accent))] transition"
+          >
+            <div className="flex items-center gap-2 truncate">
+              {mode === 'fibra' ? (
+                <Wifi size={14} className="shrink-0 text-blue-400" />
+              ) : mode === 'tv' ? (
+                <Tv size={14} className="shrink-0 text-amber-400" />
+              ) : (
+                <Layers size={14} className="shrink-0 text-emerald-400" />
+              )}
+              <span className="truncate">{meta.shortName}</span>
+            </div>
+            <span className="text-[10px] text-[hsl(var(--sidebar-foreground)/.5)] hover:underline shrink-0">Trocar</span>
+          </Link>
+        </div>
+
+        <div className="mt-4 px-2 text-[10px] font-bold uppercase tracking-[.2em] text-[hsl(var(--sidebar-foreground)/.42)]">
           Centro de controlo
         </div>
 
-        <nav className="mt-2 space-y-1 overflow-y-auto max-h-[calc(100vh-210px)] pr-1">
+        <nav className="mt-2 space-y-1 overflow-y-auto max-h-[calc(100vh-230px)] pr-1">
           {nav.map((item) => {
             const Icon = item.icon;
             const active = item.href === '/' ? location === '/' : location.startsWith(item.href);
@@ -211,14 +245,20 @@ function Shell({ children }: { children: ReactNode }) {
               <Menu size={20} />
             </button>
             <div>
-              <div className="eyebrow hidden sm:block">OSDEL TECNOLOGIA / {current}</div>
+              <div className="eyebrow hidden sm:block">
+                {activeTenant?.tradingName || 'OSDEL TECNOLOGIA'} / {current}
+              </div>
               <div className="font-serif text-xl sm:hidden">{current}</div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <ServiceModeSwitcher />
+            <SyncStatusPill />
+            <PWAInstallButton variant="compact" className="hidden xl:inline-flex" />
+
             <div
-              className={`hidden items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold sm:flex ${
+              className={`hidden items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-bold 2xl:flex ${
                 health.isError ? 'bg-[#f8e1da] text-[#a24e3a]' : 'bg-[#dceee5] text-[#237052]'
               }`}
             >
@@ -250,13 +290,15 @@ function Shell({ children }: { children: ReactNode }) {
 
             <Link href="/administracao" title="Definições e Logotipo da Empresa">
               <img
-                src={currentLogo}
-                alt="OSDEL"
+                src={activeTenant?.logoUrl || currentLogo}
+                alt={activeTenant?.tradingName || 'Empresa'}
                 className="h-8 w-8 rounded-full border border-[hsl(var(--border))] object-contain bg-white p-0.5 hover:scale-105 transition"
               />
             </Link>
           </div>
         </header>
+
+        <OfflineBanner />
 
         <div className="page-enter mx-auto max-w-[1480px] p-4 sm:p-7 lg:p-10">{children}</div>
       </main>
@@ -267,8 +309,233 @@ function Shell({ children }: { children: ReactNode }) {
 }
 
 function Dashboard() {
-  const q = useGetDashboard(); if (q.isLoading) return <><PageHeader eyebrow="Operações / hoje" title="Visão geral" detail="O pulso da sua operação, num único lugar." /><Loading /></>; if (q.isError || !q.data) return <ErrorBlock retry={() => q.refetch()} />; const d = q.data; const cards = [{ label: 'Clientes activos', value: d.activeClients, detail: `${d.inactiveClients} fora de serviço`, icon: Users, tone: 'bg-[#dceee5] text-[#237052]' }, { label: 'Receita do mês', value: kz(d.revenue), detail: 'Pagamentos confirmados', icon: CircleDollarSign, tone: 'bg-[#f8e3d6] text-[#a24e3a]' }, { label: 'Pagamentos recebidos', value: d.paidClients, detail: `${d.unpaidClients} ainda por liquidar`, icon: ReceiptText, tone: 'bg-[#dfeaf2] text-[#426b83]' }, { label: 'Em atraso', value: d.lateClients, detail: 'Contactar antes do corte', icon: Bell, tone: 'bg-[#f7e9c9] text-[#946c22]' }];
-  return <div className="space-y-7"><PageHeader eyebrow={`Operações / ${new Intl.DateTimeFormat('pt-AO', { month: 'long', year: 'numeric' }).format(new Date())}`} title={`Bom dia, ${session()?.name?.split(' ')[0] || 'equipa'}.`} detail="Pequenas decisões, sem perder o fio." action={<Button variant="outline" onClick={() => q.refetch()}><RefreshCw size={15} /> Actualizar</Button>} /><div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">{cards.map((card) => { const Icon = card.icon; const href = card.label === 'Clientes activos' ? '/clientes?status=active' : card.label === 'Receita do mês' || card.label === 'Pagamentos recebidos' ? '/pagamentos' : '/clientes?status=late'; return <Link key={card.label} href={href} className="surface rise-in group rounded-xl p-5 transition hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start justify-between"><div className={`grid h-10 w-10 place-items-center rounded-xl ${card.tone}`}><Icon size={19} /></div><ArrowUpRight size={16} className="text-[hsl(var(--muted-foreground))] opacity-0 transition group-hover:opacity-100" /></div><div data-testid={`value-${card.label}`} className="mt-5 text-[1.7rem] font-black tracking-tight">{card.value}</div><div className="mt-1 text-xs font-bold">{card.label}</div><div className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{card.detail}</div></Link>; })}</div><div className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]"><section className="surface rounded-xl p-5 sm:p-6"><div className="flex items-start justify-between"><div><p className="eyebrow">Receita & cobranças</p><h2 className="mt-1 text-lg font-extrabold">Ritmo de pagamentos</h2></div><Link href="/relatorios" className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">Ver relatório <ChevronRight size={14} /></Link></div><div className="mt-8 flex h-44 items-end gap-2 sm:gap-4">{[43, 58, 49, 67, 61, 77, 72, 90, 82, 96, 87, 100].map((height, i) => <div key={i} className="group flex flex-1 flex-col items-center gap-2"><div className={`w-full rounded-t-md transition group-hover:opacity-70 ${i > 9 ? 'bg-[hsl(var(--accent))]' : 'bg-[hsl(var(--primary)/.72)]'}`} style={{ height: `${height}%` }} /><span className="text-[10px] text-[hsl(var(--muted-foreground))]">{['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][i]}</span></div>)}</div><div className="mt-6 flex gap-5 border-t border-[hsl(var(--border))] pt-4 text-xs text-[hsl(var(--muted-foreground))]"><span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />Receita recebida</span><span className="flex items-center gap-2"><i className="h-2 w-2 rounded-full bg-[hsl(var(--accent))]" />Mês corrente</span></div></section><section className="surface rounded-xl p-5 sm:p-6"><div className="flex items-start justify-between"><div><p className="eyebrow">Fila de trabalho</p><h2 className="mt-1 text-lg font-extrabOLD">Pedir atenção</h2></div><AlertCircle className="text-[hsl(var(--accent))]" size={19} /></div><div className="mt-6 space-y-3"><Link href="/clientes?status=late" className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"><div><b className="text-sm">Cobranças em atraso</b><div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Requerem contacto</div></div><span className="mono text-lg font-black text-[hsl(var(--accent))]">{d.lateClients}</span></Link><Link href="/ordens-servico" className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"><div><b className="text-sm">Ordens de serviço</b><div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Pendentes ou em curso</div></div><span className="mono text-lg font-black text-[hsl(var(--primary))]">{d.pendingServiceOrders || 0}</span></Link><Link href="/inventario" className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"><div><b className="text-sm">Stock em alerta</b><div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Limite mínimo atingido</div></div><span className="mono text-lg font-black text-[#a24e3a]">{d.lowStockItems || 0}</span></Link><Link href="/mensagens" className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"><div><b className="text-sm">Pedidos e mensagens</b><div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Aguardam resposta</div></div><span className="mono text-lg font-black text-[hsl(var(--primary))]">{d.openRequests}</span></Link></div></section></div><section className="surface rounded-xl p-5 sm:p-6"><div className="flex items-center justify-between"><div><p className="eyebrow">Linha do tempo</p><h2 className="mt-1 text-lg font-extrabold">Actividade recente</h2></div><ArrowUpRight size={18} className="text-[hsl(var(--muted-foreground))]" /></div>{d.recentActivity.length ? <div className="mt-5 grid gap-2 md:grid-cols-2">{d.recentActivity.slice(0, 6).map((item: any, i: number) => <div key={i} className="flex items-start gap-3 rounded-lg border border-[hsl(var(--border))] p-3"><span className="mt-1.5 h-2 w-2 rounded-full bg-[hsl(var(--primary))]" /><div><b className="text-sm">{item.description}</b><p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{date(item.createdAt)}</p></div></div>)}</div> : <p className="py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">Ainda não há actividade registada.</p>}</section></div>;
+  const { mode, meta } = useServiceMode();
+  const q = useGetDashboard(mode || '');
+  if (q.isLoading)
+    return (
+      <>
+        <PageHeader
+          eyebrow={`Operações ${meta.shortName} / hoje`}
+          title={`Visão geral · ${meta.name}`}
+          detail="O pulso da sua operação, num único lugar."
+        />
+        <Loading />
+      </>
+    );
+  if (q.isError || !q.data) return <ErrorBlock retry={() => q.refetch()} />;
+  const d = q.data;
+  const cards = [
+    {
+      label: mode === 'fibra' ? 'Clientes Fibra activos' : mode === 'tv' ? 'Clientes TV activos' : 'Clientes activos',
+      value: d.activeClients,
+      detail: `${d.inactiveClients} fora de serviço`,
+      icon: mode === 'fibra' ? Wifi : mode === 'tv' ? Tv : Users,
+      tone: 'bg-[#dceee5] text-[#237052]',
+    },
+    {
+      label: mode === 'fibra' ? 'Receita Fibra do mês' : mode === 'tv' ? 'Receita TV do mês' : 'Receita do mês',
+      value: kz(d.revenue),
+      detail: 'Pagamentos confirmados',
+      icon: CircleDollarSign,
+      tone: 'bg-[#f8e3d6] text-[#a24e3a]',
+    },
+    {
+      label: 'Pagamentos recebidos',
+      value: d.paidClients,
+      detail: `${d.unpaidClients} ainda por liquidar`,
+      icon: ReceiptText,
+      tone: 'bg-[#dfeaf2] text-[#426b83]',
+    },
+    {
+      label: 'Em atraso',
+      value: d.lateClients,
+      detail: 'Contactar antes do corte',
+      icon: Bell,
+      tone: 'bg-[#f7e9c9] text-[#946c22]',
+    },
+  ];
+  return (
+    <div className="space-y-7">
+      <PageHeader
+        eyebrow={`Operações ${meta.shortName} / ${new Intl.DateTimeFormat('pt-AO', { month: 'long', year: 'numeric' }).format(new Date())}`}
+        title={`Bom dia, ${session()?.name?.split(' ')[0] || 'equipa'}.`}
+        detail={
+          mode === 'fibra'
+            ? 'Acompanhamento exclusivo de Internet Fibra Óptica, caixas PDO, ONUs e planos de banda larga.'
+            : mode === 'tv'
+            ? 'Acompanhamento exclusivo de TV a Cabo Comunitária, sinal RF, mensalidades e derivações.'
+            : 'Pequenas decisões, sem perder o fio.'
+        }
+        action={
+          <div className="flex items-center gap-2">
+            <Link
+              href="/selecionar-servico"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[hsl(var(--border))] text-xs font-bold hover:bg-[hsl(var(--secondary))] transition"
+            >
+              <Layers size={14} /> Trocar Modo ({meta.shortName})
+            </Link>
+            <Button variant="outline" onClick={() => q.refetch()}>
+              <RefreshCw size={15} /> Actualizar
+            </Button>
+          </div>
+        }
+      />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {cards.map((card) => {
+          const Icon = card.icon;
+          const href =
+            card.label.includes('Clientes')
+              ? '/clientes?status=active'
+              : card.label.includes('Receita') || card.label.includes('Pagamentos')
+              ? '/pagamentos'
+              : '/clientes?status=late';
+          return (
+            <Link
+              key={card.label}
+              href={href}
+              className="surface rise-in group rounded-xl p-5 transition hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <div className="flex items-start justify-between">
+                <div className={`grid h-10 w-10 place-items-center rounded-xl ${card.tone}`}>
+                  <Icon size={19} />
+                </div>
+                <ArrowUpRight
+                  size={16}
+                  className="text-[hsl(var(--muted-foreground))] opacity-0 transition group-hover:opacity-100"
+                />
+              </div>
+              <div data-testid={`value-${card.label}`} className="mt-5 text-[1.7rem] font-black tracking-tight">
+                {card.value}
+              </div>
+              <div className="mt-1 text-xs font-bold">{card.label}</div>
+              <div className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{card.detail}</div>
+            </Link>
+          );
+        })}
+      </div>
+      <div className="grid gap-5 xl:grid-cols-[1.3fr_.7fr]">
+        <section className="surface rounded-xl p-5 sm:p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="eyebrow">Receita & cobranças · {meta.shortName}</p>
+              <h2 className="mt-1 text-lg font-extrabold">Ritmo de pagamentos</h2>
+            </div>
+            <Link href="/relatorios" className="flex items-center gap-1 text-xs font-bold text-[hsl(var(--primary))]">
+              Ver relatório <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className="mt-8 flex h-44 items-end gap-2 sm:gap-4">
+            {[43, 58, 49, 67, 61, 77, 72, 90, 82, 96, 87, 100].map((height, i) => (
+              <div key={i} className="group flex flex-1 flex-col items-center gap-2">
+                <div
+                  className={`w-full rounded-t-md transition group-hover:opacity-70 ${
+                    i > 9 ? 'bg-[hsl(var(--accent))]' : 'bg-[hsl(var(--primary)/.72)]'
+                  }`}
+                  style={{ height: `${height}%` }}
+                />
+                <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                  {['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'][i]}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-6 flex gap-5 border-t border-[hsl(var(--border))] pt-4 text-xs text-[hsl(var(--muted-foreground))]">
+            <span className="flex items-center gap-2">
+              <i className="h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />
+              Receita recebida ({meta.shortName})
+            </span>
+            <span className="flex items-center gap-2">
+              <i className="h-2 w-2 rounded-full bg-[hsl(var(--accent))]" />
+              Mês corrente
+            </span>
+          </div>
+        </section>
+        <section className="surface rounded-xl p-5 sm:p-6">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="eyebrow">Fila de trabalho · {meta.shortName}</p>
+              <h2 className="mt-1 text-lg font-extrabold">Pedir atenção</h2>
+            </div>
+            <AlertCircle className="text-[hsl(var(--accent))]" size={19} />
+          </div>
+          <div className="mt-6 space-y-3">
+            <Link
+              href="/clientes?status=late"
+              className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"
+            >
+              <div>
+                <b className="text-sm">Cobranças em atraso</b>
+                <div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                  {mode === 'tv' ? 'Clientes TV sem pagamento' : mode === 'fibra' ? 'Clientes Fibra sem pagamento' : 'Requerem contacto'}
+                </div>
+              </div>
+              <span className="mono text-lg font-black text-[hsl(var(--accent))]">{d.lateClients}</span>
+            </Link>
+            <Link
+              href="/ordens-servico"
+              className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"
+            >
+              <div>
+                <b className="text-sm">Ordens de serviço</b>
+                <div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                  {mode === 'tv' ? 'Piquete TV a Cabo' : mode === 'fibra' ? 'Piquete Fibra Óptica' : 'Pendentes ou em curso'}
+                </div>
+              </div>
+              <span className="mono text-lg font-black text-[hsl(var(--primary))]">{d.pendingServiceOrders || 0}</span>
+            </Link>
+            <Link
+              href="/inventario"
+              className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"
+            >
+              <div>
+                <b className="text-sm">Stock em alerta</b>
+                <div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">
+                  {mode === 'tv' ? 'Materiais de TV (coaxial, fichas F)' : mode === 'fibra' ? 'Materiais de Fibra (drops, ONUs, SC/APC)' : 'Limite mínimo atingido'}
+                </div>
+              </div>
+              <span className="mono text-lg font-black text-[#a24e3a]">{d.lowStockItems || 0}</span>
+            </Link>
+            <Link
+              href="/mensagens"
+              className="flex items-center justify-between rounded-lg bg-[hsl(var(--secondary)/.6)] p-3.5 hover:bg-[hsl(var(--secondary))]"
+            >
+              <div>
+                <b className="text-sm">Pedidos e mensagens</b>
+                <div className="mt-0.5 text-xs text-[hsl(var(--muted-foreground))]">Aguardam resposta</div>
+              </div>
+              <span className="mono text-lg font-black text-[hsl(var(--primary))]">{d.openRequests}</span>
+            </Link>
+          </div>
+        </section>
+      </div>
+      <section className="surface rounded-xl p-5 sm:p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="eyebrow">Linha do tempo · {meta.shortName}</p>
+            <h2 className="mt-1 text-lg font-extrabold">Actividade recente</h2>
+          </div>
+          <ArrowUpRight size={18} className="text-[hsl(var(--muted-foreground))]" />
+        </div>
+        {d.recentActivity.length ? (
+          <div className="mt-5 grid gap-2 md:grid-cols-2">
+            {d.recentActivity.slice(0, 6).map((item: any, i: number) => (
+              <div key={i} className="flex items-start gap-3 rounded-lg border border-[hsl(var(--border))] p-3">
+                <span className="mt-1.5 h-2 w-2 rounded-full bg-[hsl(var(--primary))]" />
+                <div>
+                  <b className="text-sm">{item.description}</b>
+                  <p className="mt-1 text-[11px] text-[hsl(var(--muted-foreground))]">{date(item.createdAt)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-[hsl(var(--muted-foreground))]">
+            Ainda não há actividade registada para {meta.shortName}.
+          </p>
+        )}
+      </section>
+    </div>
+  );
 }
 
 const emptyClient = { fullName: '', phone: '', alternatePhone: '', email: '', address: '', neighborhood: '', documentNumber: '', houseCode: '', pdoNumber: '', onuNumber: '', serviceType: 'tv', notes: '' };
@@ -317,13 +584,231 @@ function Team() { const q = useListUsers(); const create = useCreateUser(); cons
 
 function Accounting() { const payments = useListPayments(); const expenses = useListExpenses(); const income = (payments.data?.items || []).reduce((s: number, p: any) => s + Number(p.amount) + Number(p.penalty || 0), 0); const out = (expenses.data?.items || []).reduce((s: number, e: any) => s + Number(e.amount), 0); return <div><PageHeader eyebrow="Leitura financeira" title="Contabilidade" detail="Uma vista simples para conferir entradas, saídas e saldo da operação." /><div className="grid gap-5 lg:grid-cols-[1.2fr_.8fr]"><section className="surface rounded-xl p-6"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[hsl(var(--secondary))] text-[hsl(var(--primary))]"><Calculator size={20} /></div><div><p className="eyebrow">Resumo geral</p><h2 className="mt-1 text-lg font-extrabold">Livro de movimentos</h2></div></div><div className="mt-7 space-y-4"><div className="flex justify-between border-b border-[hsl(var(--border))] pb-4"><span className="text-sm text-[hsl(var(--muted-foreground))]">Entradas registadas</span><b className="text-lg text-[hsl(var(--primary))]">{kz(income)}</b></div><div className="flex justify-between border-b border-[hsl(var(--border))] pb-4"><span className="text-sm text-[hsl(var(--muted-foreground))]">Saídas registadas</span><b className="text-lg text-[hsl(var(--accent))]">{kz(out)}</b></div><div className="flex justify-between"><span className="font-bold">Saldo operacional</span><b className="text-2xl">{kz(income - out)}</b></div></div></section><section className="surface grid-paper rounded-xl p-6"><p className="eyebrow">Registo local</p><h2 className="mt-1 font-serif text-2xl">Tudo conciliado.</h2><p className="mt-3 text-sm leading-6 text-[hsl(var(--muted-foreground))]">Use Relatórios para abrir por período e Contas para lançar despesas. Os dados permanecem no navegador desta equipa.</p><Link href="/relatorios" className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-[hsl(var(--primary))]">Abrir relatórios <ChevronRight size={15} /></Link></section></div></div>; }
 
-function Profile() { const u = session(); return <div><PageHeader eyebrow="A minha conta" title="Perfil" detail="Os seus dados de acesso à operação OSDEL." /><div className="surface max-w-2xl rounded-xl p-6"><div className="flex items-center gap-4 border-b border-[hsl(var(--border))] pb-6"><div className="grid h-16 w-16 place-items-center rounded-2xl bg-[hsl(var(--secondary))] font-serif text-2xl text-[hsl(var(--primary))]">{initials(u?.name)}</div><div><h2 className="text-xl font-extrabold">{u?.name || 'Administrador OSDEL'}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">@{u?.username || 'deezy'} · Administrador</p></div></div><dl className="mt-6 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-[hsl(var(--muted-foreground))]">Estado da sessão</dt><dd><Badge tone="good">Autenticado</Badge></dd></div><div className="flex justify-between"><dt className="text-[hsl(var(--muted-foreground))]">Armazenamento</dt><dd className="font-bold">Neste navegador</dd></div><div className="flex justify-between"><dt className="text-[hsl(var(--muted-foreground))]">Última actividade</dt><dd className="font-bold">Agora</dd></div></dl><Button variant="outline" className="mt-7" onClick={() => { signOut(); window.location.href = '/login'; }}><LogOut size={15} /> Terminar sessão</Button></div></div>; }
+function Profile() { const u = session(); return <div><PageHeader eyebrow="A minha conta" title="Perfil" detail="Os seus dados de acesso à operação OSDEL." /><div className="surface max-w-2xl rounded-xl p-6"><div className="flex items-center gap-4 border-b border-[hsl(var(--border))] pb-6"><div className="grid h-16 w-16 place-items-center rounded-2xl bg-[hsl(var(--secondary))] font-serif text-2xl text-[hsl(var(--primary))]">{initials(u?.name)}</div><div><h2 className="text-xl font-extrabold">{u?.name || 'Administrador OSDEL'}</h2><p className="mt-1 text-sm text-[hsl(var(--muted-foreground))]">@{u?.username || 'deezy'} · Administrador</p></div></div><dl className="mt-6 space-y-4 text-sm"><div className="flex justify-between"><dt className="text-[hsl(var(--muted-foreground))]">Estado da sessão</dt><dd><Badge tone="good">Autenticado</Badge></dd></div><div className="flex justify-between"><dt className="text-[hsl(var(--muted-foreground))]">Armazenamento</dt><dd className="font-bold">Neste navegador</dd></div><div className="flex justify-between"><dt className="text-[hsl(var(--muted-foreground))]">Última actividade</dt><dd className="font-bold">Agora</dd></div></dl><Button variant="outline" className="mt-7" onClick={() => { signOut(); window.location.href = '/selecionar-servico'; }}><LogOut size={15} /> Terminar sessão</Button></div></div>; }
 
 function Admin() { const q = useGetSettings(); const update = useUpdateSettings(); const qc = useQueryClient(); const [form, setForm] = useState<any>(); useEffect(() => { if (q.data && !form) setForm(q.data); }, [q.data, form]); if (q.isLoading || !form) return <Loading />; const saveSettings = (e: FormEvent) => { e.preventDefault(); update.mutate({ data: { companyName: form.companyName, companyPhone: form.companyPhone, companyAddress: form.companyAddress, tvMonthlyPrice: Number(form.tvMonthlyPrice), connectionFee: Number(form.connectionFee), paymentDueDay: Number(form.paymentDueDay), latePenalty: Number(form.latePenalty), suspensionAfterMonths: Number(form.suspensionAfterMonths), smsEnabled: form.smsEnabled, smsProvider: form.smsProvider, smsSender: form.smsSender } }, { onSuccess: () => qc.invalidateQueries({ queryKey: getGetSettingsQueryKey() }) }); }; const set = (key: string, value: unknown) => setForm((f: any) => ({ ...f, [key]: value })); return <div><PageHeader eyebrow="Configuração do centro" title="Administração" detail="Defina a política comercial e os canais que sustentam a operação." action={<Button type="submit" form="settings-form" disabled={update.isPending}><Check size={15} /> {update.isPending ? 'A guardar…' : 'Guardar alterações'}</Button>} /><form id="settings-form" onSubmit={saveSettings} className="grid gap-5 lg:grid-cols-[1fr_1fr]"><section className="surface rounded-xl p-6"><div className="flex items-center gap-3"><BriefcaseBusiness className="text-[hsl(var(--primary))]" size={20} /><div><p className="eyebrow">Identidade</p><h2 className="mt-1 text-lg font-extrabold">Dados da empresa</h2></div></div><div className="mt-6 space-y-4"><Field label="Nome da empresa"><Input value={form.companyName || ''} onChange={(e) => set('companyName', e.target.value)} /></Field><Field label="Telefone"><Input value={form.companyPhone || ''} onChange={(e) => set('companyPhone', e.target.value)} /></Field><Field label="Morada"><Input value={form.companyAddress || ''} onChange={(e) => set('companyAddress', e.target.value)} /></Field></div></section><section className="surface rounded-xl p-6"><div className="flex items-center gap-3"><Banknote className="text-[hsl(var(--primary))]" size={20} /><div><p className="eyebrow">Política comercial</p><h2 className="mt-1 text-lg font-extrabold">Preços & cobranças</h2></div></div><div className="mt-6 grid gap-4 sm:grid-cols-2"><Field label="TV mensalidade"><Input type="number" value={form.tvMonthlyPrice || ''} onChange={(e) => set('tvMonthlyPrice', e.target.value)} /></Field><Field label="Taxa de ligação"><Input type="number" value={form.connectionFee || ''} onChange={(e) => set('connectionFee', e.target.value)} /></Field><Field label="Vencimento (dia)"><Input type="number" value={form.paymentDueDay || ''} onChange={(e) => set('paymentDueDay', e.target.value)} /></Field><Field label="Multa por atraso"><Input type="number" value={form.latePenalty || ''} onChange={(e) => set('latePenalty', e.target.value)} /></Field><Field label="Suspender após (meses)"><Input type="number" value={form.suspensionAfterMonths || ''} onChange={(e) => set('suspensionAfterMonths', e.target.value)} /></Field></div></section><section className="surface rounded-xl p-6 lg:col-span-2"><div className="flex items-center gap-3"><MessageSquare className="text-[hsl(var(--primary))]" size={20} /><div><p className="eyebrow">Comunicações</p><h2 className="mt-1 text-lg font-extrabold">Provedor SMS</h2></div></div><div className="mt-6 grid gap-4 sm:grid-cols-3"><Field label="Provedor"><Input value={form.smsProvider || ''} onChange={(e) => set('smsProvider', e.target.value)} placeholder="Ex.: Africell API" /></Field><Field label="Remetente"><Input value={form.smsSender || ''} onChange={(e) => set('smsSender', e.target.value)} /></Field><Field label="Estado"><Select value={form.smsEnabled ? 'active' : 'inactive'} onChange={(e) => set('smsEnabled', e.target.value === 'active')}><option value="inactive">Desactivado</option><option value="active">Activo</option></Select></Field></div></section></form></div>; }
 
-function Login() { const [, setLocation] = useLocation(); const [form, setForm] = useState({ username: '', password: '' }); const [error, setError] = useState(''); const submit = (e: FormEvent) => { e.preventDefault(); const found = authenticate(form.username, form.password); if (found) setLocation('/'); else setError('Utilizador ou palavra-passe incorrectos.'); }; return <div className="grid min-h-[100dvh] lg:grid-cols-[.9fr_1.1fr]"><div className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-between"><div className="absolute inset-0 opacity-30 grid-paper" /><div className="relative"><div className="flex items-center gap-3"><div className="grid h-12 w-12 place-items-center rounded-2xl bg-[hsl(var(--sidebar-primary))] font-serif text-2xl text-[hsl(var(--sidebar-primary-foreground))]">O</div><div><div className="font-serif text-2xl">OSDEL</div><div className="text-[9px] font-bold uppercase tracking-[.22em] opacity-60">tecnologia</div></div></div><div className="mt-28 max-w-md"><p className="eyebrow text-[hsl(var(--sidebar-primary))]">Centro de operações</p><h1 className="mt-4 font-serif text-6xl leading-[.98]">A sua operação, sob controlo.</h1><p className="mt-6 max-w-sm text-sm leading-7 opacity-65">Clientes, contratos e cobranças com a clareza que a sua equipa precisa para trabalhar bem.</p></div></div><div className="relative flex items-center gap-2 text-xs opacity-55"><ShieldCheck size={15} /> Gestão local e segura para equipas OSDEL</div></div><div className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-10"><div className="w-full max-w-[420px]"><div className="mb-10 lg:hidden"><div className="flex items-center gap-3"><div className="grid h-11 w-11 place-items-center rounded-xl bg-[hsl(var(--primary))] font-serif text-xl text-[hsl(var(--primary-foreground))]">O</div><div className="font-serif text-2xl">OSDEL <span className="font-sans text-[10px] font-bold uppercase tracking-widest text-[hsl(var(--muted-foreground))]">tecnologia</span></div></div></div><p className="eyebrow">Bem-vindo de volta</p><h2 className="mt-2 font-serif text-4xl">Entrar no centro.</h2><p className="mt-3 text-sm text-[hsl(var(--muted-foreground))]">Use as credenciais da sua equipa para continuar.</p><form onSubmit={submit} className="mt-9 space-y-5"><Field label="Utilizador"><Input autoFocus data-testid="input-login-username" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} placeholder="ex.: deezy" /></Field><Field label="Palavra-passe"><Input data-testid="input-login-password" type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>{error && <div data-testid="text-login-error" className="flex items-center gap-2 rounded-lg bg-[#f8e1da] p-3 text-xs font-bold text-[#a24e3a]"><AlertCircle size={16} />{error}</div>}<Button type="submit" className="mt-2 w-full">Entrar na operação <ChevronRight size={16} /></Button></form><p className="mt-7 text-center text-[11px] text-[hsl(var(--muted-foreground))]">Sessão protegida para utilizadores autorizados.</p></div></div></div>; }
+function Login() {
+  const [, setLocation] = useLocation();
+  const [form, setForm] = useState({ username: '', password: '' });
+  const [error, setError] = useState('');
+  const { mode, meta } = useServiceMode();
+  const currentLogo = getCompanyLogo();
 
-function Guard({ children }: { children: ReactNode }) { const [, setLocation] = useLocation(); const [ready, setReady] = useState(false); useEffect(() => { if (!session()) setLocation('/login'); else setReady(true); }, [setLocation]); return ready ? <Shell>{children}</Shell> : <Loading />; }
-function Router() { return <ErrorBoundary><Switch><Route path="/login" component={Login} /><Route path="/" component={() => <Guard><Dashboard /></Guard>} /><Route path="/clientes" component={() => <Guard><ClientsPage /></Guard>} /><Route path="/clientes/:id" component={() => <Guard><ClientDetailPage /></Guard>} /><Route path="/agenda" component={() => <Guard><SchedulePage /></Guard>} /><Route path="/missoes" component={() => <Guard><TeamMissionsPage /></Guard>} /><Route path="/ordens-servico" component={() => <Guard><ServiceOrdersPage /></Guard>} /><Route path="/inventario" component={() => <Guard><InventoryPage /></Guard>} /><Route path="/contratos" component={() => <Guard><ContractsEnhanced /></Guard>} /><Route path="/pagamentos" component={() => <Guard><PaymentsPage /></Guard>} /><Route path="/facturas" component={() => <Guard><InvoicesEnhanced /></Guard>} /><Route path="/contas" component={() => <Guard><AccountsPage /></Guard>} /><Route path="/relatorios" component={() => <Guard><ReportsAdvancedPage /></Guard>} /><Route path="/mensagens" component={() => <Guard><MessagesPage /></Guard>} /><Route path="/rappels" component={() => <Guard><RappelsPage /></Guard>} /><Route path="/equipe" component={() => <Guard><TeamManagement /></Guard>} /><Route path="/contabilidade" component={() => <Guard><AccountingPage /></Guard>} /><Route path="/perfil" component={() => <Guard><UserProfilePage /></Guard>} /><Route path="/administracao" component={() => <Guard><SettingsAdvancedPage /></Guard>} /><Route component={NotFound} /></Switch></ErrorBoundary>; }
+  // Se nenhum modo foi escolhido previamente, redirecionar para a seleção de serviço
+  const { activeTenant, tenants, switchTenant } = useTenants();
+
+  useEffect(() => {
+    if (!getStoredServiceMode()) {
+      setLocation('/selecionar-servico');
+    }
+  }, [setLocation]);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const found = authenticate(form.username, form.password);
+    if (found) setLocation('/');
+    else setError('Utilizador ou palavra-passe incorrectos.');
+  };
+
+  return (
+    <div className="grid min-h-[100dvh] lg:grid-cols-[.95fr_1.05fr]">
+      {/* Painel lateral Gestão X */}
+      <div className="relative hidden overflow-hidden bg-[hsl(var(--sidebar))] p-12 text-[hsl(var(--sidebar-foreground))] lg:flex lg:flex-col lg:justify-between">
+        <div className="absolute inset-0 opacity-30 grid-paper" />
+        <div className="relative">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-slate-900 border border-slate-700/60 text-white shadow-xs font-serif text-xl font-bold">
+              GX
+            </div>
+            <div>
+              <div className="font-serif text-2xl font-bold tracking-tight">
+                Gestão X
+              </div>
+              <div className="text-[10px] uppercase font-semibold tracking-wider text-[hsl(var(--sidebar-foreground)/.5)]">
+                Software de Gestão de Telecomunicações
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-20 max-w-md">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-xs font-bold mb-4">
+              {mode === 'fibra' ? (
+                <Wifi size={13} className="text-blue-400" />
+              ) : mode === 'tv' ? (
+                <Tv size={13} className="text-amber-400" />
+              ) : (
+                <Layers size={13} className="text-emerald-400" />
+              )}
+              <span>{meta.badge}</span>
+            </div>
+            <p className="eyebrow text-[hsl(var(--sidebar-primary))]">Operação Comercial & Técnica</p>
+            <h1 className="mt-3 font-serif text-4xl sm:text-5xl leading-[1.05]">
+              {mode === 'fibra'
+                ? 'Operação Fibra Óptica'
+                : mode === 'tv'
+                ? 'Operação TV a Cabo'
+                : 'Operação Integrada TV & Fibra'}
+            </h1>
+            <p className="mt-4 max-w-sm text-sm leading-relaxed opacity-75">
+              {meta.description}
+            </p>
+
+            <div className="mt-8 rounded-2xl border border-white/15 bg-white/5 p-4 flex items-center gap-3">
+              <img
+                src={activeTenant?.logoUrl || currentLogo}
+                alt={activeTenant?.tradingName || 'OSDEL'}
+                className="h-10 w-10 rounded-xl bg-white p-1 object-contain shrink-0"
+              />
+              <div className="min-w-0">
+                <span className="block text-xs font-bold text-white truncate">
+                  {activeTenant?.tradingName || 'OSDEL TECNOLOGIA'}
+                </span>
+                <span className="block text-[11px] text-white/60">
+                  Licença Empresarial Autorizada
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative flex items-center justify-between text-xs opacity-75 border-t border-white/10 pt-4">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={15} /> Gestão X · Sistema Local & Seguro
+          </div>
+          <Link
+            href="/selecionar-servico"
+            className="hover:underline flex items-center gap-1 font-bold text-white"
+          >
+            Trocar modalidade →
+          </Link>
+        </div>
+      </div>
+
+      {/* Formulário de autenticação */}
+      <div className="flex items-center justify-center bg-[hsl(var(--background))] p-6 sm:p-10">
+        <div className="w-full max-w-[420px]">
+          <div className="mb-8 lg:hidden">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white font-serif text-lg font-bold">
+                GX
+              </div>
+              <div>
+                <div className="font-serif text-xl font-bold">Gestão X</div>
+                <div className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                  {activeTenant?.tradingName || 'OSDEL TECNOLOGIA'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <p className="eyebrow">Autenticação de Acesso</p>
+          <h2 className="mt-1 font-serif text-3xl font-bold tracking-tight">Iniciar Sessão</h2>
+          <p className="mt-2 text-sm text-[hsl(var(--muted-foreground))]">
+            Introduza os seus dados para aceder ao sistema da <b>{activeTenant?.tradingName || 'OSDEL TECNOLOGIA'}</b>.
+          </p>
+
+          <form onSubmit={submit} className="mt-7 space-y-4">
+            <Field label="Utilizador">
+              <Input
+                autoFocus
+                data-testid="input-login-username"
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+                placeholder="ex.: deezy, mestre.job, julia"
+              />
+            </Field>
+
+            <Field label="Palavra-passe">
+              <Input
+                data-testid="input-login-password"
+                type="password"
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder="Palavra-passe"
+              />
+            </Field>
+
+            {error && (
+              <div
+                data-testid="text-login-error"
+                className="flex items-center gap-2 rounded-lg bg-[#f8e1da] p-3 text-xs font-bold text-[#a24e3a]"
+              >
+                <AlertCircle size={16} />
+                {error}
+              </div>
+            )}
+
+            <Button type="submit" className="mt-2 w-full">
+              Entrar no sistema <ChevronRight size={16} />
+            </Button>
+          </form>
+
+          <div className="mt-8 pt-4 border-t border-[hsl(var(--border))] text-center">
+            <Link
+              href="/selecionar-servico"
+              className="text-xs text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] inline-flex items-center gap-1.5 transition"
+            >
+              <span>Deseja alterar a modalidade activa?</span>
+              <b className="text-[hsl(var(--primary))] underline">Mudar para Fibra / TV / Ambos</b>
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Guard({ children }: { children: ReactNode }) {
+  const [, setLocation] = useLocation();
+  const [ready, setReady] = useState(false);
+  useEffect(() => {
+    if (!session()) {
+      if (!getStoredServiceMode()) {
+        setLocation('/selecionar-servico');
+      } else {
+        setLocation('/login');
+      }
+    } else {
+      setReady(true);
+    }
+  }, [setLocation]);
+  return ready ? <Shell>{children}</Shell> : <Loading />;
+}
+
+function Router() {
+  return (
+    <ErrorBoundary>
+      <Switch>
+        <Route path="/selecionar-servico" component={ServiceSelectionPage} />
+        <Route path="/escolher-servico" component={ServiceSelectionPage} />
+        <Route path="/login" component={Login} />
+        <Route path="/imprimir" component={PrintPage} />
+        <Route path="/gestao-x-licencas" component={() => <Guard><SoftwareLicensingPage /></Guard>} />
+        <Route path="/licenciamento" component={() => <Guard><SoftwareLicensingPage /></Guard>} />
+        <Route path="/super-admin" component={() => <Guard><SoftwareLicensingPage /></Guard>} />
+        <Route path="/" component={() => <Guard><Dashboard /></Guard>} />
+        <Route path="/clientes" component={() => <Guard><ClientsPage /></Guard>} />
+        <Route path="/clientes/:id" component={() => <Guard><ClientDetailPage /></Guard>} />
+        <Route path="/agenda" component={() => <Guard><SchedulePage /></Guard>} />
+        <Route path="/missoes" component={() => <Guard><TeamMissionsPage /></Guard>} />
+        <Route path="/ordens-servico" component={() => <Guard><ServiceOrdersPage /></Guard>} />
+        <Route path="/inventario" component={() => <Guard><InventoryPage /></Guard>} />
+        <Route path="/contratos" component={() => <Guard><ContractsEnhanced /></Guard>} />
+        <Route path="/pagamentos" component={() => <Guard><PaymentsPage /></Guard>} />
+        <Route path="/facturas" component={() => <Guard><InvoicesEnhanced /></Guard>} />
+        <Route path="/contas" component={() => <Guard><AccountsPage /></Guard>} />
+        <Route path="/relatorios" component={() => <Guard><ReportsAdvancedPage /></Guard>} />
+        <Route path="/mensagens" component={() => <Guard><MessagesPage /></Guard>} />
+        <Route path="/rappels" component={() => <Guard><RappelsPage /></Guard>} />
+        <Route path="/equipe" component={() => <Guard><TeamManagement /></Guard>} />
+        <Route path="/contabilidade" component={() => <Guard><AccountingPage /></Guard>} />
+        <Route path="/perfil" component={() => <Guard><UserProfilePage /></Guard>} />
+        <Route path="/administracao" component={() => <Guard><SettingsAdvancedPage /></Guard>} />
+        <Route component={NotFound} />
+      </Switch>
+    </ErrorBoundary>
+  );
+}
 function App() { return <QueryClientProvider client={queryClient}><TooltipProvider><WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, '')}><Router /></WouterRouter><Toaster /></TooltipProvider></QueryClientProvider>; }
 export default App;

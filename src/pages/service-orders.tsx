@@ -22,7 +22,10 @@ import {
   Wrench,
   X,
   Zap,
+  ExternalLink,
 } from 'lucide-react';
+import { triggerPrint, getPrintUrl } from '@/lib/printer';
+import { useServiceMode } from '@/lib/service-mode';
 import {
   getListServiceOrdersQueryKey,
   getListClientsQueryKey,
@@ -36,6 +39,7 @@ import {
 import { Button, Field, Input, Select, Textarea, Badge, Status, Modal, PageHeader, kz, date, dateTime } from '@/components/shared-ui';
 
 export function ServiceOrdersPage() {
+  const { mode, meta } = useServiceMode();
   const qc = useQueryClient();
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -44,8 +48,8 @@ export function ServiceOrdersPage() {
   const [modalComplete, setModalComplete] = useState<any>(null);
   const [printOrder, setPrintOrder] = useState<any>(null);
 
-  const ordersQuery = useListServiceOrders({ status: statusFilter, type: typeFilter });
-  const clientsQuery = useListClients();
+  const ordersQuery = useListServiceOrders({ status: statusFilter, type: typeFilter, serviceMode: mode || undefined });
+  const clientsQuery = useListClients({ serviceMode: mode || undefined });
   const settingsQuery = useGetSettings();
 
   const createOrder = useCreateServiceOrder();
@@ -61,7 +65,7 @@ export function ServiceOrdersPage() {
     clientId: '',
     type: 'instalacao',
     priority: 'normal',
-    technician: 'Piquete Central (Mateus & João)',
+    technician: mode === 'fibra' ? 'Técnico de Fibra (Fusão & FTTH)' : 'Piquete Central TV Cabo (Mateus & João)',
     scheduledDate: new Date().toISOString().slice(0, 10),
     description: '',
     cableUsedMeters: '0',
@@ -90,13 +94,13 @@ export function ServiceOrdersPage() {
       },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
+          qc.invalidateQueries({ queryKey: getListServiceOrdersQueryKey({ serviceMode: mode || undefined }) });
           setModalNew(false);
           setNewForm({
             clientId: '',
             type: 'instalacao',
             priority: 'normal',
-            technician: 'Piquete Central (Mateus & João)',
+            technician: mode === 'fibra' ? 'Técnico de Fibra (Fusão & FTTH)' : 'Piquete Central TV Cabo (Mateus & João)',
             scheduledDate: new Date().toISOString().slice(0, 10),
             description: '',
             cableUsedMeters: '0',
@@ -123,8 +127,8 @@ export function ServiceOrdersPage() {
       },
       {
         onSuccess: () => {
-          qc.invalidateQueries({ queryKey: getListServiceOrdersQueryKey() });
-          qc.invalidateQueries({ queryKey: getListClientsQueryKey() });
+          qc.invalidateQueries({ queryKey: getListServiceOrdersQueryKey({ serviceMode: mode || undefined }) });
+          qc.invalidateQueries({ queryKey: getListClientsQueryKey({ serviceMode: mode || undefined }) });
           setModalComplete(null);
         },
       },
@@ -145,20 +149,26 @@ export function ServiceOrdersPage() {
   const cutsCount = orders.filter((o) => o.type === 'corte').length;
 
   const typeLabels: Record<string, { label: string; tone: 'good' | 'warn' | 'bad' | 'neutral' }> = {
-    instalacao: { label: 'Nova Instalação', tone: 'good' },
-    corte: { label: 'Corte de Sinal', tone: 'bad' },
+    instalacao: { label: mode === 'fibra' ? 'Instalação FTTH' : 'Instalação TV Cabo', tone: 'good' },
+    corte: { label: mode === 'fibra' ? 'Corte / Suspensão Fibra' : 'Corte de Sinal TV', tone: 'bad' },
     religacao: { label: 'Religação / Desbloqueio', tone: 'good' },
-    avaria: { label: 'Avaria / Sinal Fraco', tone: 'warn' },
-    derivacao: { label: 'Derivação / Ponto Extra', tone: 'neutral' },
-    manutencao: { label: 'Manutenção de Rede', tone: 'neutral' },
+    avaria: { label: mode === 'fibra' ? 'Atenuação Óptica / LOS' : 'Avaria / Sinal RF Fraco', tone: 'warn' },
+    derivacao: { label: mode === 'fibra' ? 'Ponto Extra Wi-Fi' : 'Derivação / Ponto TV Extra', tone: 'neutral' },
+    manutencao: { label: mode === 'fibra' ? 'Fusão / Reparação Drop' : 'Manutenção de Rede Coaxial', tone: 'neutral' },
   };
 
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Operações Técnicas"
-        title="Ordens de Serviço & Piquete"
-        detail="Coordenação do piquete de campo para instalações, cortes de sinal, religações e reparação de avarias."
+        eyebrow={`Operações Técnicas · Modo ${meta.shortName}`}
+        title={`Ordens de Serviço (${meta.shortName})`}
+        detail={
+          mode === 'fibra'
+            ? 'Coordenação do piquete técnico de Fibra Óptica para instalações FTTH, atenuação de sinal óptico, trocas de ONU e fusões.'
+            : mode === 'tv'
+            ? 'Coordenação do piquete técnico de TV a Cabo para instalações coaxiais, cortes no poste, religações e sinal RF.'
+            : 'Coordenação do piquete de campo para instalações, cortes de sinal, religações e reparação de avarias.'
+        }
         action={
           <Button
             onClick={() => {
@@ -166,7 +176,7 @@ export function ServiceOrdersPage() {
                 clientId: clients[0]?.id ? String(clients[0].id) : '',
                 type: 'instalacao',
                 priority: 'normal',
-                technician: 'Piquete Central (Mateus & João)',
+                technician: mode === 'fibra' ? 'Técnico de Fibra (Fusão & FTTH)' : 'Piquete Central TV Cabo (Mateus & João)',
                 scheduledDate: new Date().toISOString().slice(0, 10),
                 description: '',
                 cableUsedMeters: '0',
@@ -626,19 +636,36 @@ export function ServiceOrdersPage() {
           eyebrow="Documento de Campo"
           onClose={() => setPrintOrder(null)}
           maxWidth="max-w-3xl"
+          printable={true}
         >
           <div className="space-y-6">
-            <div className="flex justify-end gap-2 print:hidden">
+            <div className="flex flex-wrap items-center justify-end gap-2 print:hidden">
+              <a
+                href={getPrintUrl('ordem-servico', { id: printOrder.id })}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200"
+                title="Abre o documento numa nova aba sem restrição de iframe para imprimir ou guardar em PDF"
+              >
+                <ExternalLink size={14} />
+                <span>Abrir em Nova Aba (PDF)</span>
+              </a>
+              <Button
+                variant="primary"
+                onClick={() => triggerPrint({ elementId: 'printable-service-order' })}
+              >
+                <Printer size={16} /> Imprimir Guia
+              </Button>
               <Button variant="outline" onClick={() => setPrintOrder(null)}>
                 Fechar
-              </Button>
-              <Button onClick={() => window.print()}>
-                <Printer size={16} /> Imprimir Guia de Campo
               </Button>
             </div>
 
             {/* Folha Oficial em Papel */}
-            <div className="p-8 border-2 border-[hsl(var(--border))] rounded-xl bg-white text-black space-y-6">
+            <div
+              id="printable-service-order"
+              className="p-8 border-2 border-[hsl(var(--border))] rounded-xl bg-white text-black space-y-6 print:border-none print:p-0 print:shadow-none"
+            >
               {/* Header */}
               <div className="flex items-start justify-between border-b pb-4">
                 <div>

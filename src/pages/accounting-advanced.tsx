@@ -27,7 +27,9 @@ import {
   X,
   AlertTriangle,
   History,
+  ExternalLink,
 } from 'lucide-react';
+import { triggerPrint, getPrintUrl } from '@/lib/printer';
 import {
   getListPaymentsQueryKey,
   getListExpensesQueryKey,
@@ -1099,8 +1101,9 @@ export function AccountingPage() {
           title={`Termo de Encerramento: ${modalClosurePreview.code || `FC-${modalClosurePreview.id}`}`}
           eyebrow="Documento Oficial de Tesouraria"
           onClose={() => setModalClosurePreview(null)}
+          printable={true}
         >
-          <div className="space-y-6 text-xs" id="printable-closure-term">
+          <div className="space-y-6 text-xs print:p-0 print:border-none" id="printable-closure-term">
             {/* Header */}
             <div className="flex justify-between items-start border-b pb-4">
               <div>
@@ -1226,10 +1229,25 @@ export function AccountingPage() {
             </div>
 
             {/* Print & Action buttons */}
-            <div className="flex justify-between items-center pt-4 border-t">
-              <Button variant="outline" onClick={() => window.print()}>
-                <Printer size={15} /> Imprimir Termo de Fecho
-              </Button>
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t print:hidden">
+              <div className="flex items-center gap-2">
+                <a
+                  href={getPrintUrl('fecho-diario', { id: modalClosurePreview.id })}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200"
+                  title="Abre o documento numa nova aba sem qualquer restrição de iframe para impressão ou PDF"
+                >
+                  <ExternalLink size={14} />
+                  <span>Abrir em Nova Aba (PDF)</span>
+                </a>
+                <Button
+                  variant="outline"
+                  onClick={() => triggerPrint({ elementId: 'printable-closure-term' })}
+                >
+                  <Printer size={15} /> Imprimir Termo
+                </Button>
+              </div>
               <div className="flex gap-2">
                 {isAdmin && modalClosurePreview.status !== 'validado' && (
                   <Button

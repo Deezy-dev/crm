@@ -31,6 +31,7 @@ import { NetworkFtthTab } from '@/components/settings/network-ftth-tab';
 import { FieldTeamSlaTab } from '@/components/settings/field-team-sla-tab';
 import { CommunicationsTab } from '@/components/settings/communications-tab';
 import { SecurityFiscalDataTab } from '@/components/settings/security-fiscal-data-tab';
+import { SoftwareLicensingTab } from '@/components/settings/software-licensing-tab';
 
 export function SettingsAdvancedPage() {
   const settingsQuery = useGetSettings();
@@ -148,6 +149,13 @@ export function SettingsAdvancedPage() {
       badge: 'Auditoria',
       icon: ShieldCheck,
       description: 'Certificação AGT, faturas, políticas de sessão, logs e cópia de segurança JSON.',
+    },
+    {
+      id: 'licenciamento',
+      label: 'Software & Licença',
+      badge: 'Gestão X',
+      icon: ShieldCheck,
+      description: 'Chave de ativação, titular da licença e portal comercial do distribuidor.',
     },
   ];
 
@@ -321,6 +329,10 @@ export function SettingsAdvancedPage() {
 
         {activeTab === 'seguranca-fiscal' && (
           <SecurityFiscalDataTab form={form} set={set} isAdmin={isAdmin} />
+        )}
+
+        {activeTab === 'licenciamento' && (
+          <SoftwareLicensingTab />
         )}
 
         {/* BARRA FIXA FLUTUANTE DE GRAVAÇÃO (CASO HAJA ALTERAÇÕES) */}

@@ -36,8 +36,10 @@ import {
   useRemoveEquipment,
 } from '@/lib/local-api';
 import { Button, Field, Input, Select, Textarea, Badge, Status, Modal, PageHeader, kz, date } from '@/components/shared-ui';
+import { useServiceMode } from '@/lib/service-mode';
 
 export function InventoryPage() {
+  const { mode, meta } = useServiceMode();
   const qc = useQueryClient();
   const [tab, setTab] = useState<'stock' | 'assignments'>('stock');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -47,9 +49,9 @@ export function InventoryPage() {
   const [modalAssign, setModalAssign] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
 
-  const inventoryQuery = useListInventory({ category: categoryFilter, search });
-  const assignmentsQuery = useListEquipmentAssignments();
-  const clientsQuery = useListClients();
+  const inventoryQuery = useListInventory({ category: categoryFilter, search, serviceMode: mode || undefined });
+  const assignmentsQuery = useListEquipmentAssignments({ serviceMode: mode || undefined });
+  const clientsQuery = useListClients({ serviceMode: mode || undefined });
 
   const createItem = useCreateInventoryItem();
   const updateItem = useUpdateInventoryItem();
@@ -165,9 +167,15 @@ export function InventoryPage() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Logística & Infraestrutura"
-        title="Inventário & Stock"
-        detail="Controlo de equipamentos ópticos, cabos, conectores e material de rede instalado nos clientes."
+        eyebrow={`Logística & Infraestrutura · Modo ${meta.shortName}`}
+        title={`Inventário & Stock (${meta.shortName})`}
+        detail={
+          mode === 'fibra'
+            ? 'Controlo de equipamentos ópticos, bobinas de drop FTTH, conectores SC/APC, caixas CTO/PDO e ONUs GPON.'
+            : mode === 'tv'
+            ? 'Controlo de materiais coaxiais de TV a Cabo, cabos RG6, conectores F, splitters RF, moduladores e descodificadores.'
+            : 'Controlo de equipamentos ópticos, cabos coaxiais, conectores e material de rede instalado nos clientes.'
+        }
         action={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -176,8 +184,8 @@ export function InventoryPage() {
                 setAssignForm({
                   clientId: clients[0]?.id ? String(clients[0].id) : '',
                   inventoryItemId: items[0]?.id ? String(items[0].id) : '',
-                  equipmentType: 'ONU GPON',
-                  model: 'Huawei HG8310M',
+                  equipmentType: mode === 'tv' ? 'Receptor CATV / Descodificador' : 'ONU GPON',
+                  model: mode === 'tv' ? 'CATV Receiver RF' : 'Huawei HG8310M',
                   serialNumber: '',
                   macAddress: '',
                   pdoNumber: '',

@@ -65,8 +65,10 @@ import {
   dateTime,
   serviceLabel,
 } from '@/components/shared-ui';
+import { useServiceMode } from '@/lib/service-mode';
 
 export function RappelsPage() {
+  const { mode, meta } = useServiceMode();
   const qc = useQueryClient();
   const currentUser = session();
   const isAdmin = currentUser?.role === 'admin';
@@ -91,8 +93,8 @@ export function RappelsPage() {
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'warn' } | null>(null);
 
   // Queries
-  const clientsQuery = useListClients();
-  const paymentsQuery = useListPayments();
+  const clientsQuery = useListClients({ serviceMode: mode || undefined });
+  const paymentsQuery = useListPayments({ serviceMode: mode || undefined });
   const settingsQuery = useGetSettings();
 
   // Mutations
@@ -434,9 +436,9 @@ export function RappelsPage() {
   return (
     <div className="space-y-7">
       <PageHeader
-        eyebrow="Cobrança Activa & Gestão de Inadimplência"
-        title="Rappels & Folha de Corte"
-        detail="Monitorização rigorosa de mensalidades em atraso, escalonamento automático de 1º, 2º e 3º avisos por WhatsApp e emissão da folha de corte oficial para o piquete de rua."
+        eyebrow={`Cobrança & Recuperação · Modo ${meta.shortName}`}
+        title={`Rappels & Folha de Corte (${meta.shortName})`}
+        detail={`Monitorização de assinantes de ${meta.name} em atraso, escalonamento automático de 1º, 2º e 3º avisos por WhatsApp e emissão da folha de corte oficial para o piquete de rua.`}
         action={
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={() => setModalCutSheet(true)}>

@@ -32,6 +32,8 @@ import {
   Banknote,
   AlertTriangle,
 } from 'lucide-react';
+import { enqueueSyncMutation } from '@/lib/offline-sync';
+import { SyncStatusPill } from '@/components/sync-status-pill';
 import {
   type TeamMission,
   type MissionTask,
@@ -175,7 +177,14 @@ export function StaffMobileApp() {
   const handleCompleteMissionTask = (missionId: string, taskId: string, newStatus: MissionTask['status']) => {
     updateMissionTask(missionId, taskId, newStatus, currentUser.name, 'Concluído no local pelo técnico através do APK móvel.');
     setMissions(getStoredMissions());
-    alert(`Estado marcado como "${newStatus.toUpperCase()}"! O sistema central da OSDEL foi atualizado em tempo real.`);
+    enqueueSyncMutation({
+      module: 'missoes',
+      action: 'update',
+      entity: 'Piquete / Missão',
+      description: `Tarefa da missão #${missionId} marcada como "${newStatus.toUpperCase()}" por ${currentUser.name}`,
+      payload: { missionId, taskId, newStatus, technician: currentUser.name },
+    });
+    alert(`Estado marcado como "${newStatus.toUpperCase()}"! Se estiver sem rede móvel, a alteração foi guardada localmente e será sincronizada automaticamente com o servidor central.`);
   };
 
   // Operator approving/rejecting payment promise
@@ -351,7 +360,8 @@ export function StaffMobileApp() {
               </div>
             </div>
 
-            <div className="text-right">
+            <div className="flex items-center gap-2">
+              <SyncStatusPill />
               <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded-full text-amber-400 font-bold">
                 {currentUser.jobTitle || 'Técnico'}
               </span>

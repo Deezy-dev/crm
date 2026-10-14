@@ -403,34 +403,116 @@ div[class*="min-h-[100dvh]"] div.flex.items-center.gap-3 > div:first-child {
 }
 
 @media print {
-  body { background: #fff !important; }
-  body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  body > #root { display: block !important; }
-  body.printing-document > #root { display: none !important; }
-  body:not(.printing-document) > #root .app-shell > aside,
-  body:not(.printing-document) > #root .app-shell > main > header,
-  body:not(.printing-document) > #root button,
-  body:not(.printing-document) > #root input,
-  body:not(.printing-document) > #root select,
-  body:not(.printing-document) > #root textarea,
-  body:not(.printing-document) > #root [data-print-hide] { display: none !important; }
-  body:not(.printing-document) > #root .page-enter { max-width: none !important; padding: 0 !important; }
-  body:not(.printing-document) > #root .surface { box-shadow: none !important; }
+  @page {
+    size: A4;
+    margin: 10mm 12mm;
+  }
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body > #root {
+    display: block !important;
+    width: 100% !important;
+  }
+
+  /* When printing a standalone document or printable modal */
+  body.printing-document > #root,
+  body.printing-modal #root > .app-shell {
+    display: none !important;
+  }
+
+  /* When printing standard page view: hide navigation, headers, interactive elements */
+  body:not(.printing-document):not(.printing-modal) > #root .app-shell > aside,
+  body:not(.printing-document):not(.printing-modal) > #root .app-shell > main > header {
+    display: none !important;
+  }
+
+  body:not(.printing-document):not(.printing-modal) > #root .page-enter {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  button,
+  input,
+  select,
+  textarea,
+  .no-print,
+  [data-print-hide],
+  [data-radix-popper-content-wrapper],
+  .toaster {
+    display: none !important;
+  }
+
+  /* Printable Modals overlay & containers */
+  .printable-modal-overlay {
+    position: static !important;
+    inset: auto !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  .modal-printable-container {
+    max-width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Document paper surfaces */
   .print-backdrop {
     position: absolute !important;
     inset: 0 !important;
     overflow: visible !important;
     padding: 0 !important;
-    background: #fff !important;
+    background: #ffffff !important;
   }
   .print-toolbar { display: none !important; }
   .print-paper {
     max-width: none !important;
-    min-height: 100vh !important;
+    min-height: auto !important;
     box-shadow: none !important;
+    border: none !important;
   }
-  .document-paper { padding: 28px !important; }
-  .print-paper table { page-break-inside: auto; }
-  .print-paper tr { page-break-inside: avoid; page-break-after: auto; }
-  @page { size: A4; margin: 12mm; }
+  .document-paper { padding: 20px !important; }
+
+  /* Tables & Layout */
+  table {
+    width: 100% !important;
+    page-break-inside: auto;
+    border-collapse: collapse;
+  }
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  thead {
+    display: table-header-group;
+  }
+
+  /* Dark mode and card overrides for clean paper print */
+  .surface {
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1 !important;
+  }
+
+  /* Ensure text inside printable elements is high contrast */
+  #printable-voucher,
+  [data-printable] {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
 }

@@ -1,0 +1,50 @@
+{
+  "name": "gestaox-desktop-electron",
+  "version": "1.0.0",
+  "description": "Gestão X - Cliente Desktop Electron para CRM e Gestão de Telecomunicações",
+  "main": "main.js",
+  "author": "Albert Mbuyi Zola",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "build": "electron-builder --win",
+    "build:win": "electron-builder --win --x64",
+    "build:portable": "electron-builder --win portable --x64",
+    "pack": "electron-builder --dir"
+  },
+  "devDependencies": {
+    "electron": "^29.1.5",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "ao.gestaox.desktop",
+    "productName": "Gestão X Desktop",
+    "copyright": "Copyright © 2026 Gestão X",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Gestão X Desktop"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "assets/**/*"
+    ]
+  }
+}

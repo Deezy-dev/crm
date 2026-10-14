@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import {
@@ -17,11 +17,14 @@ import {
   Search,
   Send,
   Wifi,
+  Tv,
+  Layers,
   X,
   Zap,
   Smartphone,
   ShieldCheck,
 } from 'lucide-react';
+import { useServiceMode } from '@/lib/service-mode';
 import { MigrateToFiberModal } from '@/components/migrate-to-fiber-modal';
 import { ClientCredentialsModal } from '@/components/client-credentials-modal';
 import {
@@ -267,8 +270,9 @@ const emptyClient = {
 };
 
 export function ClientsPage() {
+  const { mode, meta, selectMode } = useServiceMode();
   const [search, setSearch] = useState('');
-  const [serviceFilter, setServiceFilter] = useState('');
+  const [serviceFilter, setServiceFilter] = useState(() => meta.filterValue);
   const [statusFilter, setStatusFilter] = useState(() => new URLSearchParams(window.location.search).get('status') || '');
   const [modal, setModal] = useState(false);
   const [edit, setEdit] = useState<Client>();
@@ -277,10 +281,16 @@ export function ClientsPage() {
   const [credentialsClient, setCredentialsClient] = useState<Client | null>(null);
   const [createdContractPreview, setCreatedContractPreview] = useState<{ client: AnyRecord; contract: AnyRecord } | null>(null);
 
+  // Sync serviceFilter whenever user switches mode in top switcher
+  useEffect(() => {
+    setServiceFilter(meta.filterValue);
+  }, [meta.filterValue]);
+
   const settingsQuery = useGetSettings();
   const q = useListClients({
     search,
-    serviceType: serviceFilter || undefined,
+    serviceType: mode && mode !== 'ambos' ? meta.filterValue : (serviceFilter || undefined),
+    serviceMode: mode || undefined,
     status: statusFilter || undefined,
   });
   const items = q.data?.items || [];
@@ -289,9 +299,15 @@ export function ClientsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Base operacional"
+        eyebrow={`Base operacional · Modo ${meta.shortName}`}
         title="Clientes"
-        detail="Gestão completa de assinantes de TV a Cabo e Internet Fibra com pesquisa por Código, Casa, BI ou Telefone."
+        detail={`Gestão completa de assinantes ${
+          mode === 'fibra'
+            ? 'de Internet Fibra Óptica'
+            : mode === 'tv'
+            ? 'de TV a Cabo Comunitária'
+            : 'de TV por Cabo & Internet Fibra'
+        } com pesquisa por Código, Casa, BI ou Telefone.`}
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={() => setPrintModal(true)}>
@@ -309,26 +325,118 @@ export function ClientsPage() {
         }
       />
 
-      {/* Tabs por serviço */}
+      {/* Banner de Modalidade Activa */}
+      {mode && mode !== 'ambos' && (
+        <div
+          data-testid="banner-active-service-mode"
+          className={`mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl p-4 border transition ${
+            mode === 'fibra'
+              ? 'bg-blue-50/80 border-blue-200 text-blue-950 dark:bg-blue-950/40 dark:border-blue-800 dark:text-blue-200'
+              : 'bg-amber-50/80 border-amber-200 text-amber-950 dark:bg-amber-950/40 dark:border-amber-800 dark:text-amber-200'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+                mode === 'fibra'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-amber-600 text-white shadow-sm'
+              }`}
+            >
+              {mode === 'fibra' ? <Wifi size={18} /> : <Tv size={18} />}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black uppercase tracking-wider">
+                  Modo Activo: {meta.name}
+                </span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-white/60 dark:bg-black/40">
+                  {meta.badge}
+                </span>
+              </div>
+              <p className="text-xs opacity-80 mt-0.5">
+                Exibindo exclusivamente clientes e serviços de {meta.shortName}.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-bold shrink-0 self-end sm:self-auto">
+            <button
+              onClick={() => selectMode('ambos')}
+              className="px-3 py-1.5 rounded-lg bg-white/80 dark:bg-slate-800 border border-current/20 hover:bg-white dark:hover:bg-slate-700 transition"
+            >
+              Ver Ambos os Serviços
+            </button>
+            <Link
+              href="/selecionar-servico"
+              className="px-3 py-1.5 rounded-lg bg-current/10 hover:bg-current/15 transition underline"
+            >
+              Trocar Modalidade
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* Tabs por serviço / estado */}
       <div className="mb-4 flex flex-wrap gap-2 border-b border-[hsl(var(--border))] pb-3">
-        {[
-          { id: '', label: 'Todos os clientes' },
-          { id: 'tv', label: 'TV a Cabo (4.000 Kz)' },
-          { id: 'internet', label: 'Internet Fibra' },
-          { id: 'combo', label: 'TV + Internet (Combo)' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setServiceFilter(tab.id)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
-              serviceFilter === tab.id
-                ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm'
-                : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary)/.8)]'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {mode === 'fibra' ? (
+          [
+            { id: '', label: 'Todos os clientes Fibra' },
+            { id: 'active', label: 'Fibra Activos (Online)' },
+            { id: 'late', label: 'Fibra em Atraso (LOS/Corte)' },
+            { id: 'suspended', label: 'Fibra Suspensos' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                statusFilter === tab.id
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary)/.8)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))
+        ) : mode === 'tv' ? (
+          [
+            { id: '', label: 'Todos os clientes TV a Cabo' },
+            { id: 'active', label: 'TV Activos (Sinal Ligado)' },
+            { id: 'late', label: 'TV em Atraso (Pendente Corte)' },
+            { id: 'suspended', label: 'TV Suspensos (Desligados)' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setStatusFilter(tab.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                statusFilter === tab.id
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary)/.8)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))
+        ) : (
+          [
+            { id: '', label: 'Todos os clientes' },
+            { id: 'tv', label: 'TV a Cabo (4.000 Kz)' },
+            { id: 'internet', label: 'Internet Fibra' },
+            { id: 'combo', label: 'TV + Internet (Combo)' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setServiceFilter(tab.id)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                serviceFilter === tab.id
+                  ? 'bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm'
+                  : 'bg-[hsl(var(--secondary))] text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary)/.8)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))
+        )}
       </div>
 
       {/* Barra de pesquisa e filtros de estado */}
@@ -336,7 +444,13 @@ export function ClientsPage() {
         <div className="relative max-w-xl flex-1">
           <Search className="absolute left-3 top-3 text-[hsl(var(--muted-foreground))]" size={17} />
           <Input
-            placeholder="Pesquisar por nome, código, casa, BI ou telefone..."
+            placeholder={
+              mode === 'fibra'
+                ? 'Pesquisar cliente fibra por nome, código, PDO, ONU, BI ou telefone...'
+                : mode === 'tv'
+                ? 'Pesquisar cliente TV por nome, código, casa, BI ou telefone...'
+                : 'Pesquisar por nome, código, casa, BI ou telefone...'
+            }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
@@ -352,6 +466,7 @@ export function ClientsPage() {
           <option value="late">Em atraso (Corte)</option>
           <option value="suspended">Suspensos (&gt;3 meses)</option>
           <option value="inactive">Inactivos</option>
+          <option value="request">Com pedido pendente</option>
         </Select>
       </div>
 
@@ -502,6 +617,7 @@ export function ClientsPage() {
       {modal && (
         <ClientModal
           client={edit}
+          defaultServiceType={mode === 'fibra' ? 'internet' : 'tv'}
           settings={settings}
           close={() => setModal(false)}
           onCreated={(res) => {
@@ -544,17 +660,23 @@ export function ClientsPage() {
 
 function ClientModal({
   client,
+  defaultServiceType = 'tv',
   settings,
   close,
   onCreated,
 }: {
   client?: Client;
+  defaultServiceType?: string;
   settings: AnyRecord;
   close: () => void;
   onCreated: (res: { client: AnyRecord; contract: AnyRecord }) => void;
 }) {
   const qc = useQueryClient();
-  const [form, setForm] = useState<any>(client ? { ...emptyClient, ...client } : emptyClient);
+  const [form, setForm] = useState<any>(
+    client
+      ? { ...emptyClient, ...client }
+      : { ...emptyClient, serviceType: defaultServiceType },
+  );
   const create = useCreateClient();
   const update = useUpdateClient();
 
@@ -740,8 +862,9 @@ function ClientModal({
    ========================================================================= */
 
 export function PaymentsPage() {
-  const clients = useListClients();
-  const paymentsQuery = useListPayments();
+  const { mode, meta } = useServiceMode();
+  const clients = useListClients({ serviceMode: mode || undefined });
+  const paymentsQuery = useListPayments({ serviceMode: mode || undefined });
   const settingsQuery = useGetSettings();
   const qc = useQueryClient();
   const createPayment = useCreatePayment();
@@ -753,7 +876,7 @@ export function PaymentsPage() {
   // Search in modal
   const [clientSearch, setClientSearch] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<number | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState('4000');
+  const [paymentAmount, setPaymentAmount] = useState(() => (mode === 'fibra' ? '6500' : '4000'));
   const [penaltyAmount, setPenaltyAmount] = useState('0');
   const [method, setMethod] = useState('multicaixa');
   const [reference, setReference] = useState('');
@@ -818,9 +941,9 @@ export function PaymentsPage() {
       },
       {
         onSuccess: (newPayment: any) => {
-          qc.invalidateQueries({ queryKey: getListPaymentsQueryKey() });
-          qc.invalidateQueries({ queryKey: getListClientsQueryKey() });
-          qc.invalidateQueries({ queryKey: getGetDashboardQueryKey() });
+          qc.invalidateQueries({ queryKey: getListPaymentsQueryKey({ serviceMode: mode || undefined }) });
+          qc.invalidateQueries({ queryKey: getListClientsQueryKey({ serviceMode: mode || undefined }) });
+          qc.invalidateQueries({ queryKey: getGetDashboardQueryKey(mode || '') });
           setModal(false);
 
           // Open invoice preview immediately
@@ -841,14 +964,21 @@ export function PaymentsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Tesouraria & Caixa"
-        title="Pagamentos"
-        detail="Registo de mensalidades com busca rápida de cliente por Nome, Casa, BI ou Telefone e aplicação automática de multa após dia 5."
+        eyebrow={`Tesouraria & Caixa · Modo ${meta.shortName}`}
+        title={`Pagamentos (${meta.shortName})`}
+        detail={`Registo de mensalidades ${
+          mode === 'fibra'
+            ? 'de Internet Fibra Óptica'
+            : mode === 'tv'
+            ? 'de TV a Cabo Comunitária (4.000 Kz)'
+            : 'de TV por Cabo & Internet Fibra'
+        } com busca rápida por Nome, Casa, BI ou Telefone e aplicação automática de multa após dia 5.`}
         action={
           <Button
             onClick={() => {
               setSelectedClientId(null);
               setClientSearch('');
+              setPaymentAmount(mode === 'fibra' ? '6500' : '4000');
               setModal(true);
             }}
           >
@@ -1114,6 +1244,7 @@ export function PaymentsPage() {
    ========================================================================= */
 
 export function ReportsPage() {
+  const { mode, meta } = useServiceMode();
   const now = new Date();
   const [period, setPeriod] = useState<'day' | 'week' | 'month' | 'year' | 'custom'>('month');
   const [customStart, setCustomStart] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
@@ -1152,6 +1283,7 @@ export function ReportsPage() {
     reportType: period,
     startDate,
     endDate,
+    serviceMode: mode || undefined,
   });
 
   const reportData = reportsQuery.data || { summary: {}, rows: [] };
@@ -1161,9 +1293,9 @@ export function ReportsPage() {
   return (
     <div>
       <PageHeader
-        eyebrow="Controlo financeiro & Gestão"
-        title="Relatórios"
-        detail="Emissão de relatórios diários, semanais, mensais e anuais com entradas, saídas justificadas, resto, total acumulado e operador."
+        eyebrow={`Controlo financeiro · Modo ${meta.shortName}`}
+        title={`Relatórios (${meta.shortName})`}
+        detail={`Emissão de relatórios financeiros de ${meta.name} com entradas, saídas justificadas, resto, total acumulado e operador.`}
         action={
           <Button variant="outline" onClick={() => setPrintModal(true)}>
             <Printer size={15} /> Imprimir Relatório Oficial (PDF)
@@ -1325,8 +1457,9 @@ export function ReportsPage() {
    ========================================================================= */
 
 export function MessagesPage() {
-  const clientsQuery = useListClients();
-  const messagesQuery = useListMessages();
+  const { mode, meta } = useServiceMode();
+  const clientsQuery = useListClients({ serviceMode: mode || undefined });
+  const messagesQuery = useListMessages({ serviceMode: mode || undefined });
   const settingsQuery = useGetSettings();
   const create = useCreateMessage();
   const qc = useQueryClient();

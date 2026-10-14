@@ -40,7 +40,9 @@ import {
   Wrench,
   FileCheck,
   Sparkles,
+  ExternalLink,
 } from 'lucide-react';
+import { triggerPrint, getPrintUrl } from '@/lib/printer';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useListExpenses,
@@ -430,7 +432,7 @@ export function AccountsPage() {
 
           <button
             id="btn-print-treasury"
-            onClick={() => window.print()}
+            onClick={() => triggerPrint()}
             className="inline-flex items-center gap-2 rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--card))] px-3.5 py-2 text-xs font-semibold text-[hsl(var(--foreground))] shadow-xs hover:bg-[hsl(var(--accent)/0.08)] transition-all"
           >
             <Printer size={15} />
@@ -2263,9 +2265,9 @@ function ExpenseVoucherModal({ expense, settings, onClose }: VoucherModalProps) 
   const cat = CATEGORIES[expense.category] || CATEGORIES.outros;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
-      <div className="w-full max-w-lg rounded-2xl border border-[hsl(var(--border))] bg-white p-6 text-slate-900 shadow-2xl dark:bg-zinc-950 dark:text-zinc-100">
-        <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-zinc-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs printable-modal-overlay print:static print:p-0 print:bg-white print:z-auto print:block">
+      <div className="w-full max-w-lg rounded-2xl border border-[hsl(var(--border))] bg-white p-6 text-slate-900 shadow-2xl dark:bg-zinc-950 dark:text-zinc-100 modal-printable-container print:max-w-none print:shadow-none print:border-none print:bg-white print:p-0">
+        <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-zinc-800 print:hidden">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
             <ReceiptText size={16} />
             <span>Guia Oficial de Saída de Caixa</span>
@@ -2276,7 +2278,7 @@ function ExpenseVoucherModal({ expense, settings, onClose }: VoucherModalProps) 
         </div>
 
         {/* Printable Area */}
-        <div id="printable-voucher" className="mt-4 space-y-4 rounded-xl border border-slate-200 p-5 bg-slate-50 dark:bg-zinc-900/50 dark:border-zinc-800 text-xs">
+        <div id="printable-voucher" className="mt-4 space-y-4 rounded-xl border border-slate-200 p-5 bg-slate-50 dark:bg-zinc-900/50 dark:border-zinc-800 text-xs print:mt-0 print:border-none print:bg-white print:p-0">
           <div className="flex items-center justify-between border-b border-slate-200 pb-3 dark:border-zinc-800">
             <div>
               <div className="font-serif text-lg font-black tracking-tight text-slate-900 dark:text-white">
@@ -2332,7 +2334,7 @@ function ExpenseVoucherModal({ expense, settings, onClose }: VoucherModalProps) 
           </div>
 
           {/* Amount Box */}
-          <div className="rounded-xl bg-slate-900 p-4 text-white text-center dark:bg-black">
+          <div className="rounded-xl bg-slate-900 p-4 text-white text-center dark:bg-black print:bg-slate-900 print:text-white">
             <span className="text-[10px] uppercase font-bold tracking-widest text-slate-400">Valor Total Liquidado</span>
             <div className="mt-1 text-2xl font-black">{kz(expense.amount)}</div>
             {Number(expense.taxWithheld || 0) > 0 && (
@@ -2355,17 +2357,27 @@ function ExpenseVoucherModal({ expense, settings, onClose }: VoucherModalProps) 
           </div>
         </div>
 
-        <div className="mt-4 flex items-center justify-end gap-2">
+        <div className="mt-4 flex flex-wrap items-center justify-end gap-2 print:hidden">
+          <a
+            href={getPrintUrl('guia-saida', { id: expense.id })}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 transition dark:bg-zinc-800 dark:border-zinc-700 dark:text-zinc-200"
+            title="Abre o documento numa nova aba sem qualquer restrição de iframe para impressão ou PDF"
+          >
+            <ExternalLink size={14} />
+            <span>Abrir em Nova Aba (PDF)</span>
+          </a>
           <button
-            onClick={() => window.print()}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700"
+            onClick={() => triggerPrint({ elementId: 'printable-voucher' })}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition cursor-pointer"
           >
             <Printer size={15} />
             <span>Imprimir Guia</span>
           </button>
           <button
             onClick={onClose}
-            className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800 cursor-pointer"
           >
             Fechar
           </button>

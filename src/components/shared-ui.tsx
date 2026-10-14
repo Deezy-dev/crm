@@ -187,17 +187,31 @@ export function Modal({
   children,
   onClose,
   maxWidth = 'max-w-2xl',
+  printable = false,
 }: {
   title: string;
   eyebrow?: string;
   children: ReactNode;
   onClose: () => void;
   maxWidth?: string;
+  printable?: boolean;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-[#142f35]/45 p-0 backdrop-blur-sm sm:items-center sm:p-6 print:hidden">
-      <div className={`max-h-[92dvh] w-full ${maxWidth} overflow-auto rounded-t-2xl bg-[hsl(var(--card))] shadow-2xl sm:rounded-2xl`}>
-        <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--card)/.96)] px-5 py-4 backdrop-blur sm:px-7">
+    <div
+      className={`fixed inset-0 z-50 flex items-end justify-center bg-[#142f35]/45 p-0 backdrop-blur-sm sm:items-center sm:p-6 ${
+        printable
+          ? 'print:fixed print:inset-0 print:bg-white print:z-[9999] print:p-0 print:m-0 print:overflow-visible print:block printable-modal-overlay'
+          : 'print:hidden'
+      }`}
+    >
+      <div
+        className={`max-h-[92dvh] w-full ${maxWidth} overflow-auto rounded-t-2xl bg-[hsl(var(--card))] shadow-2xl sm:rounded-2xl ${
+          printable
+            ? 'print:max-h-none print:shadow-none print:rounded-none print:border-none print:bg-white print:text-black print:overflow-visible print:w-full print:max-w-none print:p-0 modal-printable-container'
+            : ''
+        }`}
+      >
+        <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[hsl(var(--border))] bg-[hsl(var(--card)/.96)] px-5 py-4 backdrop-blur sm:px-7 print:hidden">
           <div>
             <p className="eyebrow">{eyebrow}</p>
             <h2 className="mt-1 font-serif text-2xl">{title}</h2>
@@ -206,12 +220,12 @@ export function Modal({
             aria-label="Fechar janela"
             data-testid="button-close-modal"
             onClick={onClose}
-            className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] cursor-pointer"
+            className="rounded-lg p-2 text-[hsl(var(--muted-foreground))] hover:bg-[hsl(var(--secondary))] cursor-pointer print:hidden"
           >
             <X size={19} />
           </button>
         </header>
-        <div className="p-5 sm:p-7">{children}</div>
+        <div className="p-5 sm:p-7 print:p-0 print:m-0">{children}</div>
       </div>
     </div>
   );
