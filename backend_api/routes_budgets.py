@@ -109,6 +109,22 @@ def update_budget(budget_id):
         'budget': budget.to_dict()
     }), 200
 
+@budgets_bp.route('/<int:budget_id>/status', methods=['PATCH'])
+@jwt_required()
+def update_budget_status(budget_id):
+    budget = Budget.query.get_or_404(budget_id)
+    data = request.get_json() or {}
+    new_status = data.get('status')
+    if not new_status:
+        return jsonify({'success': False, 'message': 'Status é obrigatório.'}), 400
+    budget.status = new_status
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': f'Status do orçamento {budget.number} atualizado para {new_status}!',
+        'budget': budget.to_dict()
+    }), 200
+
 @budgets_bp.route('/<int:budget_id>', methods=['DELETE'])
 @jwt_required()
 def delete_budget(budget_id):

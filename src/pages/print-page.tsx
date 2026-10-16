@@ -1,8 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'wouter';
-import { Printer, ArrowLeft, X, Check, FileText } from 'lucide-react';
-import { useListExpenses, useListCashClosures, useListServiceOrders, useListClients, useGetSettings } from '@/lib/local-api';
+import { Printer, ArrowLeft, X, Check, FileText, Receipt, Landmark } from 'lucide-react';
+import {
+  useListExpenses,
+  useListCashClosures,
+  useListServiceOrders,
+  useListClients,
+  useGetSettings,
+  useListInvoices,
+  useListPayments
+} from '@/lib/local-api';
 import { getMonthlyClosures, type MonthlyClosure } from '@/lib/monthly-closures';
+import { getCompanyLogo } from '@/lib/company-logo';
 import { kz, date, dateTime } from '@/components/shared-ui';
 
 export function PrintPage() {
@@ -16,14 +25,23 @@ export function PrintPage() {
   const closuresQuery = useListCashClosures();
   const serviceOrdersQuery = useListServiceOrders();
   const clientsQuery = useListClients();
+  const invoicesQuery = useListInvoices();
+  const paymentsQuery = useListPayments();
 
+  // Dual format for invoices: 'pos' (impressora térmica 80mm/58mm) ou 'a4' (página padrão A4)
+  const initialFormat = searchParams.get('formato') === 'a4' ? 'a4' : 'pos';
+  const [invoiceFormat, setInvoiceFormat] = useState<'a4' | 'pos'>(initialFormat);
   const [hasAutoPrinted, setHasAutoPrinted] = useState(false);
 
   const expenses = (expensesQuery.data as any[]) || [];
   const cashClosures = (closuresQuery.data as any[]) || [];
   const serviceOrders = (serviceOrdersQuery.data?.items as any[]) || [];
   const clients = (clientsQuery.data?.items as any[]) || [];
+  const invoices = (invoicesQuery.data?.items as any[]) || [];
+  const payments = (Array.isArray(paymentsQuery.data) ? paymentsQuery.data : paymentsQuery.data?.items) || [];
   const monthlyClosures = getMonthlyClosures();
+
+  const isInvoiceType = ['fatura', 'factura', 'recibo', 'pagamento', 'invoice'].includes(tipo.toLowerCase());
 
   // Find target item
   const selectedExpense = idParam
@@ -42,6 +60,15 @@ export function PrintPage() {
     ? serviceOrders.find((s) => String(s.id) === String(idParam))
     : serviceOrders[0];
 
+  const selectedInvoice = idParam
+    ? invoices.find((inv) => String(inv.id) === String(idParam) || inv.invoiceNumber === idParam) ||
+      payments.find((p) => String(p.id) === String(idParam) || p.invoiceNumber === idParam)
+    : invoices[0] || payments[0];
+
+  const selectedInvoiceClient = selectedInvoice
+    ? clients.find((c) => c.id === selectedInvoice.clientId)
+    : undefined;
+
   // Auto trigger print when ready
   useEffect(() => {
     if (hasAutoPrinted) return;
@@ -53,12 +80,47 @@ export function PrintPage() {
       } catch (err) {
         console.warn('Erro na chamada automática de impressão:', err);
       }
-    }, 500);
+    }, 600);
     return () => clearTimeout(timer);
-  }, [hasAutoPrinted, selectedExpense, selectedCashClosure, selectedMonthlyClosure]);
+  }, [hasAutoPrinted, selectedExpense, selectedCashClosure, selectedMonthlyClosure, selectedInvoice]);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 print:bg-white print:p-0">
+      {/* CSS Dinâmico para Impressora Térmica POS 80mm */}
+      {isInvoiceType && invoiceFormat === 'pos' && (
+        <style>{`
+          @media print {
+            @page {
+              size: 80mm auto !important;
+              margin: 2mm 3mm !important;
+            }
+            body {
+              background: #ffffff !important;
+              color: #000000 !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            header, .print\\:hidden {
+              display: none !important;
+            }
+            main {
+              max-width: 80mm !important;
+              width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            .pos-receipt-paper {
+              max-width: 80mm !important;
+              width: 72mm !important;
+              margin: 0 !important;
+              padding: 2mm !important;
+              border: none !important;
+              box-shadow: none !important;
+            }
+          }
+        `}</style>
+      )}
+
       {/* Top Floating Control Bar - Hidden on print */}
       <header className="sticky top-0 z-50 flex items-center justify-between border-b border-slate-300 bg-white/95 px-6 py-3 shadow-md backdrop-blur-md print:hidden">
         <div className="flex items-center gap-3">
@@ -78,18 +140,48 @@ export function PrintPage() {
           <div className="flex items-center gap-2">
             <span className="inline-block h-2 w-2 rounded-full bg-emerald-500" />
             <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">
-              Documento Pronto para Impressão / PDF
+              {isInvoiceType
+                ? (invoiceFormat === 'pos' ? 'Talão Térmico POS (80mm)' : 'Factura Oficial (A4)')
+                : 'Documento Pronto para Impressão / PDF'}
             </span>
           </div>
         </div>
 
+        {/* Seletor Dual de Formato (A4 vs Térmica POS) quando for factura */}
         <div className="flex items-center gap-2">
+          {isInvoiceType && (
+            <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 border border-slate-300 mr-2">
+              <button
+                type="button"
+                onClick={() => setInvoiceFormat('pos')}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  invoiceFormat === 'pos'
+                    ? 'bg-white text-emerald-700 shadow-sm border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🧾 Térmica POS (80mm)
+              </button>
+              <button
+                type="button"
+                onClick={() => setInvoiceFormat('a4')}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                  invoiceFormat === 'a4'
+                    ? 'bg-white text-blue-700 shadow-sm border border-slate-200'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                📄 Formato A4
+              </button>
+            </div>
+          )}
+
           <button
             onClick={() => window.print()}
             className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition"
           >
             <Printer size={15} />
-            <span>Imprimir Agora (Ctrl + P)</span>
+            <span>Imprimir {isInvoiceType ? (invoiceFormat === 'pos' ? 'Talão POS' : 'A4') : 'Agora'} (Ctrl + P)</span>
           </button>
           <button
             onClick={() => window.close()}
@@ -102,8 +194,25 @@ export function PrintPage() {
       </header>
 
       {/* Main Printable Document Canvas */}
-      <main className="mx-auto max-w-[800px] p-4 sm:p-8 print:max-w-none print:p-0">
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-xl print:rounded-none print:border-none print:p-0 print:shadow-none">
+      <main className={`mx-auto p-4 sm:p-8 print:max-w-none print:p-0 ${isInvoiceType && invoiceFormat === 'pos' ? 'max-w-[420px]' : 'max-w-[800px]'}`}>
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 sm:p-8 shadow-xl print:rounded-none print:border-none print:p-0 print:shadow-none">
+          {/* TIPO: FACTURA / RECIBO (DUAL FORMATO: TÉRMICA POS OU A4) */}
+          {isInvoiceType && selectedInvoice && (
+            invoiceFormat === 'pos' ? (
+              <ThermalInvoiceReceipt
+                invoice={selectedInvoice}
+                client={selectedInvoiceClient}
+                settings={settings}
+              />
+            ) : (
+              <A4InvoiceOfficial
+                invoice={selectedInvoice}
+                client={selectedInvoiceClient}
+                settings={settings}
+              />
+            )
+          )}
+
           {/* TIPO: GUIA DE SAÍDA / VOUCHER */}
           {tipo === 'guia-saida' && selectedExpense && (
             <ExpenseVoucherDocument
@@ -138,7 +247,7 @@ export function PrintPage() {
           )}
 
           {/* FALLBACK: ITEM NÃO ENCONTRADO */}
-          {!selectedExpense && !selectedMonthlyClosure && !selectedCashClosure && !selectedServiceOrder && (
+          {!selectedExpense && !selectedMonthlyClosure && !selectedCashClosure && !selectedServiceOrder && (!isInvoiceType || !selectedInvoice) && (
             <div className="p-12 text-center">
               <FileText size={36} className="mx-auto text-slate-400 mb-3" />
               <h2 className="text-lg font-bold text-slate-800">Documento não encontrado</h2>
@@ -532,6 +641,364 @@ function ServiceOrderDocument({ order, client, settings }: { order: any; client?
           <b className="block">O Cliente (Conformidade)</b>
           <span className="text-[10px] text-slate-500">Assinatura</span>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------
+// 5. COMPONENTE: TALÃO TÉRMICO POS (80MM / 58MM) - IMPRESSORAS DE RECIBO
+// ---------------------------------------------------------------------------------------
+function ThermalInvoiceReceipt({
+  invoice,
+  client,
+  settings,
+}: {
+  invoice: any;
+  client?: any;
+  settings?: any;
+}) {
+  const company = settings?.companyName || 'OSDEL TECNOLOGIA LDA';
+  const subtitle = settings?.companySubtitle || 'TV CABO COMUNITÁRIA & INTERNET FIBRA';
+  const phone = settings?.companyPhone || '+244 923 000 000';
+  const nif = settings?.companyNif || '5417089214';
+  const address = settings?.companyAddress || 'Luanda, Angola';
+
+  const amount = Number(invoice.amount || invoice.monthlyFee || 4000);
+  const penalty = Number(invoice.penalty || 0);
+  const total = Number(invoice.total || (amount + penalty));
+  const num = invoice.invoiceNumber || invoice.number || `FT-${String(invoice.id || 1).padStart(5, '0')}`;
+  const issueDate = invoice.paidAt || invoice.issuedAt || invoice.createdAt || new Date().toISOString();
+  const dueDate = invoice.dueDate || invoice.due_date || invoice.paymentMonth || 'Dia 05';
+  const paymentMethod = invoice.paymentMethod || invoice.method || invoice.payment_method || 'Multicaixa';
+  const refCode = invoice.referenceCode || invoice.reference || invoice.reference_code || `MCX-${String(invoice.id || 1).padStart(6, '0')}`;
+  const operator = invoice.operator || 'Caixa Central';
+
+  const isVoid = invoice.status === 'anulada';
+  const isPending = invoice.status === 'pendente' || invoice.documentType === 'proforma';
+
+  return (
+    <div className="pos-receipt-paper mx-auto w-full max-w-[320px] bg-white p-3 font-mono text-[11px] leading-tight text-black print:max-w-none print:p-0">
+      {/* Cabeçalho com Logótipo Oficial para Impressora Térmica */}
+      <div className="text-center pb-2 border-b border-dashed border-black">
+        <div className="flex justify-center pb-1.5">
+          <img
+            src={getCompanyLogo(settings?.logoUrl)}
+            alt="Logótipo OSDEL"
+            className="h-14 w-14 object-contain mx-auto"
+            style={{ filter: 'grayscale(100%) contrast(180%)' }}
+          />
+        </div>
+        <h2 className="text-sm font-black uppercase tracking-wider">{company}</h2>
+        <p className="text-[10px] font-bold text-slate-800 uppercase mt-0.5">{subtitle}</p>
+        <p className="text-[9.5px] mt-0.5 font-bold">NIF: {nif}</p>
+        <p className="text-[9px]">Tel: {phone}</p>
+        <p className="text-[9px]">{address}</p>
+      </div>
+
+      {/* Identificação do Documento */}
+      <div className="py-2 border-b border-dashed border-black text-center">
+        <p className="text-xs font-black uppercase tracking-wider">
+          {isVoid ? '*** FACTURA ANULADA ***' : isPending ? 'FACTURA PROFORMA' : 'FACTURA / RECIBO DE PAGAMENTO'}
+        </p>
+        <p className="text-sm font-black tracking-widest mt-0.5">{num}</p>
+        <p className="text-[9px] mt-0.5">
+          Data: <strong>{date(issueDate)}</strong> · Hora: {new Date(issueDate).toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' })}
+        </p>
+        <p className="text-[9px] text-slate-800">Vencimento: {dueDate}</p>
+      </div>
+
+      {/* Dados do Cliente / Assinante */}
+      <div className="py-2 border-b border-dashed border-black space-y-0.5 text-[10px]">
+        <p><b>ASSINANTE:</b> {client?.fullName || invoice.clientName || invoice.client_name || 'Consumidor Final'}</p>
+        <p><b>CÓDIGO:</b> {client?.code || `CLI-${String(invoice.clientId || invoice.client_id || 1).padStart(5, '0')}`}</p>
+        <p><b>NIF / BI:</b> {client?.documentNumber || client?.nif || 'Consumidor Final'}</p>
+        <p><b>TEL:</b> {client?.phone || '—'}</p>
+        {(client?.neighborhood || client?.address) && (
+          <p><b>ZONA:</b> {client?.neighborhood || client?.address}</p>
+        )}
+        {client?.houseCode && <p><b>CASA / BLOCO:</b> {client.houseCode}</p>}
+        {client?.pdoNumber && <p><b>CAIXA PDO:</b> {client.pdoNumber}</p>}
+        {client?.onuNumber && <p><b>ONU SERIAL:</b> {client.onuNumber}</p>}
+      </div>
+
+      {/* Linha de Artigos / Serviços */}
+      <div className="py-2 border-b border-dashed border-black">
+        <div className="flex justify-between font-bold text-[10px] uppercase border-b border-black pb-1 mb-1">
+          <span>DESCRIÇÃO</span>
+          <span className="text-right">VALOR</span>
+        </div>
+        <div className="flex justify-between text-[10.5px]">
+          <span className="truncate max-w-[200px]">
+            {invoice.itemDescription || invoice.description || `Mensalidade (${invoice.paymentMonth || 'Corrente'})`}
+          </span>
+          <span className="font-bold">{kz(amount)}</span>
+        </div>
+        {penalty > 0 && (
+          <div className="flex justify-between mt-1 text-[10px]">
+            <span>Multa por Regularização</span>
+            <span className="font-bold">{kz(penalty)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Total Liquidado e Pagamento */}
+      <div className="py-2.5 border-b-2 border-black text-right">
+        <p className="text-[10px] uppercase font-bold text-slate-800">VALOR TOTAL LIQUIDADO:</p>
+        <p className="text-2xl font-black">{kz(total)}</p>
+        <p className="text-[9.5px] mt-0.5 font-bold uppercase">Forma: {paymentMethod}</p>
+        <p className="text-[9px]">Ref: {refCode}</p>
+        <p className="text-[9.5px] font-bold text-slate-900 mt-0.5">
+          Estado: {isVoid ? 'ANULADA' : isPending ? 'PENDENTE' : 'LIQUIDADO / EM DIA'}
+        </p>
+      </div>
+
+      {/* Enquadramento Fiscal */}
+      <div className="py-1.5 border-b border-dashed border-black text-center text-[8.5px] text-slate-800">
+        Regime de Exclusão do IVA nos termos do Art. 12.º do CIVA
+      </div>
+
+      {/* Rodapé de Cortesia */}
+      <div className="pt-2 text-center text-[9px] leading-tight text-slate-800 space-y-0.5">
+        <p className="font-bold uppercase">Obrigado pela sua preferência!</p>
+        <p>Guarde este talão como comprovativo e garantia de sinal ligado.</p>
+        <p className="pt-1 font-mono text-[8px] text-slate-600">
+          Operador: @{operator} · Gestão X Desktop
+        </p>
+        <p className="text-[8px] tracking-widest text-slate-500 mt-1">*** OBRIGADO / VOLTE SEMPRE ***</p>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------
+// 6. COMPONENTE: FACTURA OFICIAL A4 (PADRÃO FISCAL CORPORATIVO)
+// ---------------------------------------------------------------------------------------
+function A4InvoiceOfficial({
+  invoice,
+  client,
+  settings,
+}: {
+  invoice: any;
+  client?: any;
+  settings?: any;
+}) {
+  const company = settings?.companyName || 'OSDEL TECNOLOGIA LDA';
+  const subtitle = settings?.companySubtitle || 'TV CABO COMUNITÁRIA & INTERNET FIBRA ÓPTICA';
+  const phone = settings?.companyPhone || '+244 923 000 000';
+  const email = settings?.companyEmail || 'geral@osdeltecnologia.ao';
+  const nif = settings?.companyNif || '5417089214';
+  const address = settings?.companyAddress || 'Rua 12, Bairro Golf I, Kilamba Kiaxi, Luanda';
+
+  const amount = Number(invoice.amount || invoice.monthlyFee || 4000);
+  const penalty = Number(invoice.penalty || 0);
+  const total = Number(invoice.total || (amount + penalty));
+  const num = invoice.invoiceNumber || invoice.number || `FT-${String(invoice.id || 1).padStart(5, '0')}`;
+  const issueDate = invoice.paidAt || invoice.issuedAt || invoice.createdAt || new Date().toISOString();
+  const dueDate = invoice.dueDate || invoice.due_date || invoice.paymentMonth || 'Dia 05';
+  const paymentMethod = invoice.paymentMethod || invoice.method || invoice.payment_method || 'Multicaixa';
+  const refCode = invoice.referenceCode || invoice.reference || invoice.reference_code || `MCX-${String(invoice.id || 1).padStart(6, '0')}`;
+  const operator = invoice.operator || 'Caixa Central';
+
+  const isVoid = invoice.status === 'anulada';
+  const isPending = invoice.status === 'pendente' || invoice.documentType === 'proforma';
+
+  const banks = settings?.bankAccounts || [
+    { name: 'Banco BAI', iban: 'AO06.0040.0000.1234.5678.9012.3', account: '12345678/10/001', holder: company },
+    { name: 'Banco BFA', iban: 'AO06.0006.0000.9876.5432.1098.7', account: '98765432/01/001', holder: company },
+  ];
+
+  return (
+    <div className="a4-invoice-paper space-y-6 text-xs text-slate-900 font-sans">
+      {/* Cabeçalho Oficial com Logótipo */}
+      <div className="flex items-start justify-between gap-6 border-b-2 border-[#0b4a8a] pb-6">
+        <div className="flex items-center gap-4">
+          <img
+            src={getCompanyLogo(settings?.logoUrl)}
+            alt="Logótipo OSDEL"
+            className="h-20 w-20 rounded-2xl border-2 border-[#0b4a8a] object-contain p-1.5 bg-white shadow-sm"
+          />
+          <div>
+            <h1 className="font-serif text-2xl font-black tracking-tight text-[#0b4a8a]">{company}</h1>
+            <p className="mt-0.5 text-xs font-bold text-[#1e90ff] uppercase">{subtitle}</p>
+            <p className="mt-1.5 text-[11px] leading-4 text-slate-600">
+              NIF: <strong>{nif}</strong> · Tel: {phone} · Email: {email}
+              <br />
+              {address}
+            </p>
+          </div>
+        </div>
+
+        <div className="text-right">
+          <span className={`inline-block rounded px-3 py-1 font-mono text-[10px] font-black uppercase tracking-wider text-white ${
+            isVoid ? 'bg-rose-600' : isPending ? 'bg-amber-600' : 'bg-[#0b4a8a]'
+          }`}>
+            {isVoid ? 'FACTURA ANULADA' : isPending ? 'FACTURA PROFORMA' : 'FACTURA / RECIBO OFICIAL'}
+          </span>
+          <p className="mt-2 font-mono text-xl font-black text-[#0b4a8a]">{num}</p>
+          <p className="mt-1 text-xs text-slate-600">
+            Data de Emissão: <strong>{date(issueDate)}</strong>
+          </p>
+          <p className="text-[11px] text-slate-500">Vencimento: {dueDate}</p>
+        </div>
+      </div>
+
+      {/* Cards de Identificação: Cliente & Transacção */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-300 bg-slate-50/60 p-4 space-y-1">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Dados do Assinante / Cliente</p>
+          <p className="text-sm font-black text-[#0b4a8a]">
+            {client?.fullName || invoice.clientName || invoice.client_name || 'Consumidor Final'}
+          </p>
+          <p className="text-xs text-slate-700">
+            <b>Código:</b> {client?.code || `CLI-${String(invoice.clientId || invoice.client_id || 1).padStart(5, '0')}`} · <b>NIF/BI:</b> {client?.documentNumber || client?.nif || 'Consumidor Final'}
+          </p>
+          <p className="text-xs text-slate-700">
+            <b>Telefone:</b> {client?.phone || 'Sem telefone associado'}
+          </p>
+          <p className="text-xs text-slate-700">
+            <b>Morada:</b> {client?.address || '—'} {client?.neighborhood ? `(${client.neighborhood})` : ''}
+          </p>
+          {(client?.houseCode || client?.pdoNumber || client?.onuNumber) && (
+            <div className="pt-1 text-[11px] text-slate-600 flex flex-wrap gap-2">
+              {client?.houseCode && <span>Casa: <b>{client.houseCode}</b></span>}
+              {client?.pdoNumber && <span>PDO: <b>{client.pdoNumber}</b></span>}
+              {client?.onuNumber && <span>ONU: <b>{client.onuNumber}</b></span>}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-[#0b4a8a]">Detalhes da Liquidação</p>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">Período de Referência:</span>
+            <b className="font-mono">{invoice.paymentMonth || 'Período Corrente'}</b>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">Forma de Pagamento:</span>
+            <b className="capitalize">{paymentMethod}</b>
+          </div>
+          <div className="flex justify-between text-xs">
+            <span className="text-slate-600">Código de Referência:</span>
+            <b className="font-mono">{refCode}</b>
+          </div>
+          <div className="flex justify-between text-xs pt-1 border-t border-blue-200">
+            <span className="text-slate-600">Estado do Documento:</span>
+            <b className={isVoid ? 'text-rose-600' : isPending ? 'text-amber-700' : 'text-emerald-700 font-black'}>
+              {isVoid ? 'ANULADO' : isPending ? 'PENDENTE DE PAGAMENTO' : 'LIQUIDADO / REGULARIZADO'}
+            </b>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabela de Artigos e Serviços */}
+      <div className="overflow-hidden rounded-xl border border-slate-300">
+        <table className="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr className="bg-slate-100 text-slate-700 font-bold border-b border-slate-300 text-[10px] uppercase tracking-wider">
+              <th className="p-3">Descrição do Serviço / Artigo</th>
+              <th className="p-3 text-center">Qtd</th>
+              <th className="p-3 text-right">Preço Unit.</th>
+              <th className="p-3 text-right">Taxa IVA</th>
+              <th className="p-3 text-right">Total (AOA)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            <tr>
+              <td className="p-3.5">
+                <b className="block text-sm text-[#0b4a8a]">
+                  {invoice.itemDescription || invoice.description || `Mensalidade de Serviço OSDEL (${invoice.paymentMonth || 'Corrente'})`}
+                </b>
+                <span className="text-[11px] text-slate-600">
+                  {invoice.notes || 'Fornecimento e manutenção regular de sinal com garantia de estabilidade.'}
+                </span>
+              </td>
+              <td className="p-3.5 text-center font-mono font-bold">1</td>
+              <td className="p-3.5 text-right font-mono">{kz(amount)}</td>
+              <td className="p-3.5 text-right text-[11px] text-slate-500">Isento*</td>
+              <td className="p-3.5 text-right font-mono font-bold text-slate-900">{kz(amount)}</td>
+            </tr>
+            {penalty > 0 && (
+              <tr>
+                <td className="p-3">
+                  <b className="text-slate-900">Multa por Regularização Fora de Prazo</b>
+                  <span className="block text-[11px] text-slate-500">Acordo de vencimento após o dia de referência</span>
+                </td>
+                <td className="p-3 text-center font-mono font-bold">1</td>
+                <td className="p-3 text-right font-mono">{kz(penalty)}</td>
+                <td className="p-3 text-right text-[11px] text-slate-500">Isento*</td>
+                <td className="p-3.5 text-right font-mono font-bold text-slate-900">{kz(penalty)}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Caixa de Totais e Enquadramento Fiscal */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[11px] text-slate-600 space-y-1">
+          <p className="font-bold text-slate-900 uppercase text-[10px]">Enquadramento Fiscal:</p>
+          <p>
+            * Regime de Exclusão do IVA nos termos do Artigo 12.º do Código do Imposto sobre o Valor Acrescentado (CIVA).
+          </p>
+          <p className="text-[10px] text-slate-500 pt-1">
+            Operador Responsável: <b>@{operator}</b>
+          </p>
+        </div>
+
+        <div className="rounded-xl bg-[#0b4a8a] p-5 text-white text-right space-y-1 ml-auto w-full sm:w-[280px]">
+          <div className="flex justify-between text-xs opacity-80">
+            <span>Subtotal:</span>
+            <span className="font-mono">{kz(amount)}</span>
+          </div>
+          {penalty > 0 && (
+            <div className="flex justify-between text-xs opacity-80">
+              <span>Multa:</span>
+              <span className="font-mono">{kz(penalty)}</span>
+            </div>
+          )}
+          <div className="flex justify-between text-xs opacity-90 pt-1.5 border-t border-white/20 font-bold">
+            <span>Total Liquidado:</span>
+            <span className="font-mono">{kz(total)}</span>
+          </div>
+          <div className="text-2xl font-black pt-1">{kz(total)}</div>
+        </div>
+      </div>
+
+      {/* Coordenadas Bancárias Oficiais */}
+      <div className="rounded-xl border border-slate-300 bg-slate-50/50 p-4">
+        <p className="text-[10px] font-black uppercase tracking-wider text-[#0b4a8a] mb-2 flex items-center gap-1.5">
+          <Landmark size={14} /> Coordenadas Bancárias Oficiais para Pagamento
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          {banks.map((b: any, idx: number) => (
+            <div key={idx} className="bg-white p-3 rounded-lg border border-slate-200">
+              <b className="text-[#0b4a8a] block text-xs">{b.name}</b>
+              <span className="text-[11px] text-slate-600 block">Titular: {b.holder || company}</span>
+              <span className="font-mono text-[10.5px] text-slate-800 block mt-0.5 select-all">IBAN: {b.iban}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Assinaturas & Homologação */}
+      <div className="grid grid-cols-2 gap-8 pt-8 text-center text-xs">
+        <div>
+          <div className="border-t border-slate-400 pt-2" />
+          <b className="block text-slate-900">O Assinante / Destinatário</b>
+          <span className="text-[11px] text-slate-500">Assinatura legível</span>
+        </div>
+        <div>
+          <div className="border-t border-slate-400 pt-2" />
+          <b className="block text-slate-900">Pela OSDEL TECNOLOGIA LDA</b>
+          <span className="text-[11px] text-slate-500">Carimbo e Assinatura Autorizada</span>
+        </div>
+      </div>
+
+      {/* Rodapé Legal */}
+      <div className="border-t border-slate-200 pt-3 text-[10px] text-slate-400 flex justify-between">
+        <span>Documento processado por computador com validade de quitação interna · OSDEL TECNOLOGIA</span>
+        <span>Impresso em: {dateTime(new Date().toISOString())}</span>
       </div>
     </div>
   );

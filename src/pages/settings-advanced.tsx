@@ -15,6 +15,8 @@ import {
   Sparkles,
   RefreshCw,
   SlidersHorizontal,
+  Users,
+  Printer,
 } from 'lucide-react';
 import { Button } from '@/components/shared-ui';
 import {
@@ -32,6 +34,8 @@ import { FieldTeamSlaTab } from '@/components/settings/field-team-sla-tab';
 import { CommunicationsTab } from '@/components/settings/communications-tab';
 import { SecurityFiscalDataTab } from '@/components/settings/security-fiscal-data-tab';
 import { SoftwareLicensingTab } from '@/components/settings/software-licensing-tab';
+import { PermissionsRolesTab } from '@/components/settings/permissions-roles-tab';
+import { ThermalPrinterTab } from '@/components/settings/thermal-printer-tab';
 
 export function SettingsAdvancedPage() {
   const settingsQuery = useGetSettings();
@@ -149,6 +153,20 @@ export function SettingsAdvancedPage() {
       badge: 'Auditoria',
       icon: ShieldCheck,
       description: 'Certificação AGT, faturas, políticas de sessão, logs e cópia de segurança JSON.',
+    },
+    {
+      id: 'permissoes-papeis',
+      label: 'Perfis & Permissões',
+      badge: 'RBAC',
+      icon: Users,
+      description: 'Controlo estrito de privilégios para Técnico, Operador, Admin e Caixa.',
+    },
+    {
+      id: 'impressora-termica',
+      label: 'Impressão & POS',
+      badge: 'Térmica',
+      icon: Printer,
+      description: 'Largura 80mm/58mm, logótipo, corte automático de talão e rodapé.',
     },
     {
       id: 'licenciamento',
@@ -329,6 +347,14 @@ export function SettingsAdvancedPage() {
 
         {activeTab === 'seguranca-fiscal' && (
           <SecurityFiscalDataTab form={form} set={set} isAdmin={isAdmin} />
+        )}
+
+        {activeTab === 'permissoes-papeis' && (
+          <PermissionsRolesTab form={form} set={set} isAdmin={isAdmin} />
+        )}
+
+        {activeTab === 'impressora-termica' && (
+          <ThermalPrinterTab form={form} set={set} isAdmin={isAdmin} />
         )}
 
         {activeTab === 'licenciamento' && (

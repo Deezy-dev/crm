@@ -590,13 +590,18 @@ document.addEventListener('DOMContentLoaded', () => {
           <td>${inv.due_date || '--'}</td>
           <td><span class="badge badge-${inv.status}">${inv.status}</span></td>
           <td style="text-align: right;">
-            ${inv.status === 'pendente' || inv.status === 'vencida' ? `
-              <button class="btn btn-sm btn-primary" onclick="window.openPaymentModal(${inv.id}, '${escapeHtml(inv.number)}', '${escapeHtml(inv.client_name)}', ${inv.total})">
-                Receber
+            <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+              <button class="btn btn-sm btn-secondary" title="Imprimir em A4 ou Térmica POS" onclick="window.openInvoicePrintModal(${inv.id})">
+                🖨️ Imprimir
               </button>
-            ` : `
-              <span style="font-size: 11px; color: var(--success); font-weight: 600;">✓ Paga</span>
-            `}
+              ${inv.status === 'pendente' || inv.status === 'vencida' ? `
+                <button class="btn btn-sm btn-primary" onclick="window.openPaymentModal(${inv.id}, '${escapeHtml(inv.number)}', '${escapeHtml(inv.client_name)}', ${inv.total})">
+                  Receber
+                </button>
+              ` : `
+                <span style="font-size: 11px; color: var(--success); font-weight: 600;">✓ Paga</span>
+              `}
+            </div>
           </td>
         `;
         tbody.appendChild(tr);
@@ -696,6 +701,194 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       showToast(err.message, 'error');
     }
+  });
+
+  // =========================================================================
+  // MODAL DE IMPRESSÃO: DUAL FORMATO (A4 E POS TÉRMICA 80MM)
+  // =========================================================================
+  let currentPrintInvoice = null;
+  let currentPrintFormat = 'pos'; // Inicia com o talão térmico por conveniência de caixa
+
+  window.openInvoicePrintModal = function(id) {
+    currentPrintInvoice = cachedInvoices.find(i => i.id === id);
+    if (!currentPrintInvoice) {
+      showToast('Fatura não encontrada.', 'error');
+      return;
+    }
+    currentPrintFormat = 'pos';
+    renderPrintPreview();
+    openModal('modal-print-invoice');
+  };
+
+  function renderPrintPreview() {
+    if (!currentPrintInvoice) return;
+    const inv = currentPrintInvoice;
+    const container = document.getElementById('print-preview-container');
+    const modalTitle = document.getElementById('print-modal-title');
+    const btnA4 = document.getElementById('btn-format-a4');
+    const btnPos = document.getElementById('btn-format-pos');
+
+    if (modalTitle) modalTitle.textContent = `Imprimir Fatura · ${inv.number}`;
+
+    if (currentPrintFormat === 'pos') {
+      btnPos?.classList.add('btn-primary');
+      btnPos?.classList.remove('btn-secondary');
+      btnA4?.classList.remove('btn-primary');
+      btnA4?.classList.add('btn-secondary');
+
+      container.innerHTML = `
+        <div class="pos-receipt-paper">
+          <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 8px; margin-bottom: 8px;">
+            <div style="margin-bottom: 6px;">
+              <img src="../public/logo.png" onerror="this.src='/logo.png'; this.onerror=null;" alt="Logótipo" style="height: 48px; width: 48px; object-fit: contain; margin: 0 auto; filter: grayscale(100%) contrast(180%); display: block;" />
+            </div>
+            <p style="font-weight: 900; font-size: 14px; text-transform: uppercase;">OSDEL TECNOLOGIA</p>
+            <p style="font-size: 10px; font-weight: bold; color: #475569;">TV CABO COMUNITÁRIA & FIBRA</p>
+            <p style="font-size: 9px; margin-top: 2px;">NIF: 5417089214</p>
+            <p style="font-size: 9px;">Tel: +244 923 000 000</p>
+            <p style="font-size: 9px;">Luanda, Angola</p>
+          </div>
+          
+          <div style="text-align: center; border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px;">
+            <p style="font-weight: 900; font-size: 11px; text-transform: uppercase;">TALÃO / FACTURA RECIBO</p>
+            <p style="font-weight: 900; font-size: 13px; letter-spacing: 1px;">${escapeHtml(inv.number)}</p>
+            <p style="font-size: 9px;">Data: ${new Date().toLocaleDateString('pt-AO')} · Venc: ${inv.due_date || '--'}</p>
+          </div>
+
+          <div style="border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px; line-height: 1.3;">
+            <p><strong>CLIENTE:</strong> ${escapeHtml(inv.client_name)}</p>
+            <p><strong>CÓDIGO:</strong> CLI-${String(inv.client_id).padStart(5, '0')}</p>
+            <p><strong>DOC / NIF:</strong> Consumidor Final</p>
+          </div>
+
+          <div style="border-bottom: 1px dashed #000; padding-bottom: 6px; margin-bottom: 6px;">
+            <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 10px; margin-bottom: 4px;">
+              <span>ARTIGO / SERVIÇO</span>
+              <span>VALOR</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 10.5px;">
+              <span>Mensalidade de Serviço</span>
+              <span style="font-weight: bold;">${formatKz(inv.amount)}</span>
+            </div>
+            ${inv.penalty > 0 ? `
+              <div style="display: flex; justify-content: space-between; font-size: 10px; color: #92400e;">
+                <span>Multa por Atraso</span>
+                <span>${formatKz(inv.penalty)}</span>
+              </div>
+            ` : ''}
+          </div>
+
+          <div style="border-bottom: 2px solid #000; padding: 6px 0; text-align: right;">
+            <p style="font-size: 10px; text-transform: uppercase; font-weight: bold;">TOTAL LIQUIDADO:</p>
+            <p style="font-size: 20px; font-weight: 900; margin: 2px 0;">${formatKz(inv.total)}</p>
+            <p style="font-size: 9px; font-weight: bold; text-transform: uppercase;">Estado: ${inv.status.toUpperCase()}</p>
+            <p style="font-size: 9px;">Ref: ${escapeHtml(inv.reference_code || 'MCX-OSDEL')}</p>
+          </div>
+
+          <div style="text-align: center; padding-top: 8px; font-size: 9px; color: #334155; line-height: 1.3;">
+            <p style="font-weight: bold; text-transform: uppercase;">Obrigado pela preferência!</p>
+            <p>Guarde este talão para efeitos de garantia do serviço.</p>
+            <p style="font-size: 8px; color: #64748b; margin-top: 4px;">Operador: ${escapeHtml(window.api.getCurrentUser()?.username || 'Caixa')} · Gestão X</p>
+          </div>
+        </div>
+      `;
+    } else {
+      // Formato A4
+      btnA4?.classList.add('btn-primary');
+      btnA4?.classList.remove('btn-secondary');
+      btnPos?.classList.remove('btn-primary');
+      btnPos?.classList.add('btn-secondary');
+
+      container.innerHTML = `
+        <div class="a4-invoice-paper">
+          <div style="display: flex; justify-content: space-between; border-bottom: 2px solid #0284c7; padding-bottom: 14px; margin-bottom: 14px;">
+            <div>
+              <h2 style="font-size: 18px; font-weight: 900; color: #0284c7; text-transform: uppercase;">OSDEL TECNOLOGIA</h2>
+              <p style="font-size: 11px; font-weight: bold; color: #0369a1;">TV CABO COMUNITÁRIA & INTERNET FIBRA ÓPTICA</p>
+              <p style="font-size: 10px; color: #64748b; margin-top: 4px;">NIF: 5417089214 · Tel: +244 923 000 000 · Luanda, Angola</p>
+            </div>
+            <div style="text-align: right;">
+              <span style="background: #0284c7; color: #fff; font-size: 9px; font-weight: bold; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">
+                FACTURA / RECIBO DE PAGAMENTO
+              </span>
+              <p style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 6px;">${escapeHtml(inv.number)}</p>
+              <p style="font-size: 11px; color: #64748b;">Emissão: ${new Date().toLocaleDateString('pt-AO')}</p>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; margin-bottom: 14px;">
+            <div>
+              <p style="font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b;">Destinatário / Assinante</p>
+              <p style="font-size: 14px; font-weight: bold; color: #0f172a; margin-top: 2px;">${escapeHtml(inv.client_name)}</p>
+              <p style="font-size: 11px; color: #475569;">Código: CLI-${String(inv.client_id).padStart(5, '0')}</p>
+            </div>
+            <div>
+              <p style="font-size: 10px; text-transform: uppercase; font-weight: bold; color: #64748b;">Condições de Liquidação</p>
+              <p style="font-size: 11px; color: #0f172a; margin-top: 2px;">Vencimento: <strong>${inv.due_date || '--'}</strong></p>
+              <p style="font-size: 11px; color: #0f172a;">Forma: <strong>${escapeHtml(inv.payment_method || 'Multicaixa')}</strong></p>
+              <p style="font-size: 11px; color: #059669; font-weight: bold;">Estado: ${inv.status.toUpperCase()}</p>
+            </div>
+          </div>
+
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px; font-size: 11.5px;">
+            <thead>
+              <tr style="border-bottom: 1px solid #cbd5e1; text-align: left; background: #f1f5f9;">
+                <th style="padding: 6px 8px;">Descrição do Serviço</th>
+                <th style="padding: 6px 8px; text-align: center;">Qtd</th>
+                <th style="padding: 6px 8px; text-align: right;">Preço Unit.</th>
+                <th style="padding: 6px 8px; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom: 1px solid #e2e8f0;">
+                <td style="padding: 8px;">Mensalidade Contratual de Sinal</td>
+                <td style="padding: 8px; text-align: center;">1</td>
+                <td style="padding: 8px; text-align: right;">${formatKz(inv.amount)}</td>
+                <td style="padding: 8px; text-align: right; font-weight: bold;">${formatKz(inv.amount)}</td>
+              </tr>
+              ${inv.penalty > 0 ? `
+                <tr style="border-bottom: 1px solid #e2e8f0;">
+                  <td style="padding: 8px;">Multa por Regularização Fora do Prazo</td>
+                  <td style="padding: 8px; text-align: center;">1</td>
+                  <td style="padding: 8px; text-align: right;">${formatKz(inv.penalty)}</td>
+                  <td style="padding: 8px; text-align: right; font-weight: bold;">${formatKz(inv.penalty)}</td>
+                </tr>
+              ` : ''}
+            </tbody>
+          </table>
+
+          <div style="display: flex; justify-content: flex-end; margin-bottom: 16px;">
+            <div style="background: #0284c7; color: #ffffff; padding: 12px 18px; border-radius: 8px; min-width: 220px; text-align: right;">
+              <span style="font-size: 10px; text-transform: uppercase; font-weight: bold; opacity: 0.9;">Total a Pagar / Liquidado</span>
+              <p style="font-size: 22px; font-weight: 900; margin-top: 2px;">${formatKz(inv.total)}</p>
+            </div>
+          </div>
+
+          <div style="border-top: 1px solid #e2e8f0; padding-top: 10px; font-size: 9.5px; color: #64748b; text-align: center;">
+            <p>Documento processado por computador com validade de quitação fiscal interna · OSDEL TECNOLOGIA</p>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  document.getElementById('btn-format-a4')?.addEventListener('click', () => {
+    currentPrintFormat = 'a4';
+    renderPrintPreview();
+  });
+
+  document.getElementById('btn-format-pos')?.addEventListener('click', () => {
+    currentPrintFormat = 'pos';
+    renderPrintPreview();
+  });
+
+  document.getElementById('btn-trigger-print')?.addEventListener('click', () => {
+    document.body.classList.remove('print-mode-pos', 'print-mode-a4');
+    document.body.classList.add(currentPrintFormat === 'pos' ? 'print-mode-pos' : 'print-mode-a4');
+    window.print();
+    setTimeout(() => {
+      document.body.classList.remove('print-mode-pos', 'print-mode-a4');
+    }, 1000);
   });
 
   // =========================================================================

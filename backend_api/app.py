@@ -9,8 +9,10 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     
-    # Habilita CORS completo (obrigatorio para integracao Desktop e Web)
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+    # Habilita CORS completo (obrigatorio para integracao Desktop, Electron e Web)
+    CORS(app, resources={r"/*": {"origins": "*"}}, 
+         allow_headers=["Content-Type", "Authorization", "Accept"],
+         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"])
     
     # Inicializa SQLAlchemy e JWT
     db.init_app(app)

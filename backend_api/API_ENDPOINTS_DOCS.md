@@ -240,3 +240,103 @@ Autenticação: Todos os endpoints protegidos exigem o cabeçalho HTTP:
   }
 }
 ```
+
+---
+
+## 5. ORÇAMENTOS E PROPOSTAS
+
+### 5.1 Listar Orçamentos
+- **Método / Rota:** `GET /api/v1/budgets?status=pendente`
+- **Cabeçalho:** `Authorization: Bearer <access_token>`
+- **Exemplo de Resposta (200 OK):**
+```json
+{
+  "success": true,
+  "count": 1,
+  "items": [
+    {
+      "id": 1,
+      "number": "ORC-00001",
+      "client_name": "Mateus Manuel da Silva",
+      "service_type": "fibra",
+      "description": "Instalação de cabo drop óptico 80m + ONU Huawei GPON",
+      "total_amount": 25000.0,
+      "discount": 2500.0,
+      "final_amount": 22500.0,
+      "status": "aprovado",
+      "validity_days": 15
+    }
+  ]
+}
+```
+
+### 5.2 Criar Orçamento
+- **Método / Rota:** `POST /api/v1/budgets`
+- **Cabeçalho:** `Authorization: Bearer <access_token>`
+- **Exemplo de Requisição (JSON):**
+```json
+{
+  "client_name": "António Bernardo",
+  "service_type": "fibra",
+  "total_amount": 35000.0,
+  "discount": 5000.0,
+  "validity_days": 15,
+  "description": "Instalação de rede interna de fibra óptica e roteador Wi-Fi 6"
+}
+```
+
+### 5.3 Atualizar Status do Orçamento
+- **Método / Rota:** `PATCH /api/v1/budgets/1/status`
+- **Cabeçalho:** `Authorization: Bearer <access_token>`
+- **Exemplo de Requisição (JSON):**
+```json
+{
+  "status": "aprovado"
+}
+```
+
+---
+
+## 6. GESTÃO DE USUÁRIOS E OPERADORES
+
+### 6.1 Listar Usuários
+- **Método / Rota:** `GET /api/v1/users`
+- **Cabeçalho:** `Authorization: Bearer <access_token>`
+- **Exemplo de Resposta (200 OK):**
+```json
+{
+  "success": true,
+  "count": 2,
+  "items": [
+    {
+      "id": 1,
+      "username": "admin",
+      "full_name": "Albert (Administrador Geral)",
+      "email": "admin@osdel.ao",
+      "role": "admin",
+      "is_active": true
+    },
+    {
+      "id": 2,
+      "username": "operador1",
+      "full_name": "Maria Teresa dos Santos",
+      "role": "operador",
+      "is_active": true
+    }
+  ]
+}
+```
+
+### 6.2 Criar Usuário (Operador)
+- **Método / Rota:** `POST /api/v1/users` ou `POST /api/v1/auth/register`
+- **Cabeçalho:** `Authorization: Bearer <access_token>`
+- **Exemplo de Requisição (JSON):**
+```json
+{
+  "username": "tecnico_joao",
+  "password": "senhaForte123",
+  "full_name": "João Baptista",
+  "role": "tecnico"
+}
+```
+

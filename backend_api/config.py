@@ -12,6 +12,12 @@ class Config:
         f"sqlite:///{os.path.join(BASE_DIR, 'gestaox.db')}"
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {
+            "timeout": 30,
+            "check_same_thread": False
+        }
+    }
     
     # JWT Settings
     JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "gestaox-jwt-jwt-super-secret-key-2026")

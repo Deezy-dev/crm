@@ -23,6 +23,14 @@ import {
   Maximize2,
   Minimize2,
   RefreshCw,
+  Printer,
+  Receipt,
+  Upload,
+  Eye,
+  EyeOff,
+  Lock,
+  Download,
+  ExternalLink,
 } from 'lucide-react';
 import {
   type PaymentPromise,
@@ -35,7 +43,8 @@ import {
   createSupportTicket,
   getStoredAnnouncements,
 } from '@/lib/client-portal';
-import { useListClients, useListPayments, useListClientContracts } from '@/lib/local-api';
+import { useListClients, useListPayments, useListClientContracts, useListInvoices } from '@/lib/local-api';
+import { getPrintUrl } from '@/lib/printer';
 import { Link } from 'wouter';
 
 const kz = (value: unknown) =>
@@ -83,14 +92,44 @@ export function ClientMobileApp() {
     (p: any) => p.clientId === activeClient.id,
   );
 
+  const invoicesQuery = useListInvoices();
+  const allInvoices = invoicesQuery.data?.items || [];
+  const clientInvoices = allInvoices.filter(
+    (inv: any) =>
+      inv.clientId === activeClient.id ||
+      inv.client_id === activeClient.id ||
+      inv.clientName?.toLowerCase() === activeClient.fullName?.toLowerCase(),
+  );
+
   // Tabs
-  const [activeTab, setActiveTab] = useState<'inicio' | 'contrato' | 'avarias' | 'noticias' | 'diagnostico'>('inicio');
+  const [activeTab, setActiveTab] = useState<
+    'inicio' | 'faturas' | 'wifi' | 'contrato' | 'avarias' | 'noticias' | 'diagnostico'
+  >('inicio');
   const [fullscreenMode, setFullscreenMode] = useState(false);
 
-  // Modals
+  // Modals & Extras
   const [modalPromise, setModalPromise] = useState(false);
   const [modalTicket, setModalTicket] = useState(false);
+  const [modalComprovativo, setModalComprovativo] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [showWifiPassword, setShowWifiPassword] = useState(false);
+
+  // Comprovativo Form
+  const [compBank, setCompBank] = useState('Banco BAI');
+  const [compRef, setCompRef] = useState('');
+  const [compAmount, setCompAmount] = useState(String(activeContract.monthlyPrice || 4000));
+  const [compFileName, setCompFileName] = useState('');
+  const [compSuccess, setCompSuccess] = useState(false);
+
+  // Real-time speed test
+  const [speedTestRunning, setSpeedTestRunning] = useState(false);
+  const [speedProgress, setSpeedProgress] = useState(0);
+  const [speedMetrics, setSpeedMetrics] = useState<{
+    download: number;
+    upload: number;
+    ping: number;
+    jitter: number;
+  } | null>(null);
 
   // Lists from client portal
   const [promises, setPromises] = useState<PaymentPromise[]>(() => getStoredPromises());
@@ -195,6 +234,43 @@ export function ClientMobileApp() {
     }, 1800);
   };
 
+  const handleSendComprovativo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!compRef.trim()) {
+      alert('Por favor insira a referência ou número de transacção do comprovativo.');
+      return;
+    }
+    setCompSuccess(true);
+    setTimeout(() => {
+      setCompSuccess(false);
+      setModalComprovativo(false);
+      setCompRef('');
+      setCompFileName('');
+      alert(
+        'Comprovativo bancário enviado com sucesso para a central de atendimento OSDEL! O operador irá validar a transacção e dar baixa na sua mensalidade.'
+      );
+    }, 1200);
+  };
+
+  const runSpeedTest = () => {
+    setSpeedTestRunning(true);
+    setSpeedProgress(15);
+    setSpeedMetrics(null);
+
+    setTimeout(() => setSpeedProgress(45), 600);
+    setTimeout(() => setSpeedProgress(80), 1200);
+    setTimeout(() => {
+      setSpeedProgress(100);
+      setSpeedTestRunning(false);
+      setSpeedMetrics({
+        download: activeClient.serviceType === 'tv' ? 18.5 : 22.4,
+        upload: activeClient.serviceType === 'tv' ? 8.2 : 19.8,
+        ping: 11,
+        jitter: 2,
+      });
+    }, 1800);
+  };
+
   return (
     <div className={`min-h-screen ${fullscreenMode ? 'bg-slate-950 p-0' : 'p-4 md:p-8 bg-slate-100 flex flex-col items-center'}`}>
       {/* Top Controls Bar (Only visible outside or top of emulator) */}
@@ -294,6 +370,58 @@ export function ClientMobileApp() {
                 {activeClient.code}
               </span>
             </div>
+          </div>
+
+          {/* Quick Header Chips */}
+          <div className="mt-2.5 pt-2 border-t border-white/20 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px]">
+            <button
+              onClick={() => setActiveTab('inicio')}
+              className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                activeTab === 'inicio' ? 'bg-white text-blue-900' : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <Tv size={12} /> Início
+            </button>
+            <button
+              onClick={() => setActiveTab('faturas')}
+              className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                activeTab === 'faturas' ? 'bg-white text-blue-900' : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <Receipt size={12} /> Facturas & Comprovativo
+            </button>
+            <button
+              onClick={() => setActiveTab('wifi')}
+              className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                activeTab === 'wifi' ? 'bg-white text-blue-900' : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <Wifi size={12} /> Meu Wi-Fi
+            </button>
+            <button
+              onClick={() => setActiveTab('avarias')}
+              className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                activeTab === 'avarias' ? 'bg-white text-blue-900' : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <AlertCircle size={12} /> Avarias
+            </button>
+            <button
+              onClick={() => setActiveTab('diagnostico')}
+              className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                activeTab === 'diagnostico' ? 'bg-white text-blue-900' : 'bg-white/15 text-white hover:bg-white/25'
+              }`}
+            >
+              <Activity size={12} /> Velocidade
+            </button>
+            <a
+              href={`https://wa.me/244923000000?text=Ol%C3%A1%20OSDEL,%20sou%20o%20cliente%20${encodeURIComponent(activeClient.fullName)}%20(${activeClient.code})%20e%20preciso%20de%20assist%C3%AAncia.`}
+              target="_blank"
+              rel="noreferrer"
+              className="px-2 py-1 rounded-lg font-bold shrink-0 bg-emerald-500 text-white hover:bg-emerald-600 flex items-center gap-1 shadow-xs"
+            >
+              <MessageSquare size={12} /> WhatsApp
+            </a>
           </div>
         </header>
 
@@ -473,6 +601,260 @@ export function ClientMobileApp() {
             </div>
           )}
 
+          {/* TAB: FACTURAS & COMPROVATIVOS DO CLIENTE */}
+          {activeTab === 'faturas' && (
+            <div className="space-y-3.5 text-xs">
+              {/* Current Monthly Bill Banner */}
+              <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white p-4 space-y-3 shadow-sm">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
+                      Mensalidade Atual ({new Date().toLocaleString('pt-AO', { month: 'long' })})
+                    </span>
+                    <b className="text-2xl font-black text-amber-400 block mt-0.5">
+                      {kz(activeContract.monthlyPrice || 4000)}
+                    </b>
+                  </div>
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                      activeClient.status === 'late'
+                        ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                        : 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
+                    }`}
+                  >
+                    {activeClient.status === 'late' ? 'Por Liquidar' : 'Em Dia'}
+                  </span>
+                </div>
+
+                <div className="pt-2 border-t border-slate-700/80 flex items-center justify-between text-[11px]">
+                  <span className="text-slate-300">Vencimento: Dia 05</span>
+                  <button
+                    onClick={() => setModalComprovativo(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-[11px] hover:bg-emerald-400 shadow-sm transition"
+                  >
+                    <Upload size={13} /> Enviar Comprovativo
+                  </button>
+                </div>
+              </div>
+
+              {/* Bank Transfer Coordinates Card */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-xs">
+                <b className="text-xs font-bold text-slate-800 block border-b border-slate-100 pb-2">
+                  Coordenadas para Pagamento por Transferência
+                </b>
+
+                <div className="space-y-2">
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <b className="text-slate-900 block text-xs">Banco BAI</b>
+                      <span className="font-mono text-[10px] text-slate-500">AO06.0040.0000.1234.5678.9012.3</span>
+                    </div>
+                    <button
+                      onClick={() => handleCopy('AO06.0040.0000.1234.5678.9012.3', 'iban_bai')}
+                      className="px-2 py-1 rounded-lg bg-white border border-slate-200 font-bold text-[10px] text-slate-700 hover:bg-slate-100"
+                    >
+                      {copiedField === 'iban_bai' ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between">
+                    <div>
+                      <b className="text-slate-900 block text-xs">Banco BFA</b>
+                      <span className="font-mono text-[10px] text-slate-500">AO06.0006.0000.9876.5432.1098.7</span>
+                    </div>
+                    <button
+                      onClick={() => handleCopy('AO06.0006.0000.9876.5432.1098.7', 'iban_bfa')}
+                      className="px-2 py-1 rounded-lg bg-white border border-slate-200 font-bold text-[10px] text-slate-700 hover:bg-slate-100"
+                    >
+                      {copiedField === 'iban_bfa' ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Invoices List with Dual Formats (POS Thermal with Logo & A4) */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div>
+                    <b className="text-xs font-bold text-slate-800 block">As Minhas Facturas & Recibos</b>
+                    <span className="text-[10px] text-slate-400">Imprima o talão de recibo ou factura oficial</span>
+                  </div>
+                  <span className="text-[10px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                    {clientInvoices.length > 0 ? clientInvoices.length : 1} Documentos
+                  </span>
+                </div>
+
+                <div className="space-y-2.5">
+                  {(clientInvoices.length > 0
+                    ? clientInvoices
+                    : [
+                        {
+                          id: 101,
+                          invoiceNumber: 'FT-2026/00142',
+                          amount: activeContract.monthlyPrice || 4000,
+                          total: activeContract.monthlyPrice || 4000,
+                          status: 'paga',
+                          issuedAt: new Date().toISOString(),
+                          dueDate: 'Dia 05',
+                          paymentMethod: 'Multicaixa',
+                        },
+                      ]
+                  ).map((inv: any) => (
+                    <div
+                      key={inv.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50/50 p-3 space-y-2"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <span className="font-mono text-[10px] font-bold text-blue-700 block">
+                            {inv.invoiceNumber || `FT-${inv.id}`}
+                          </span>
+                          <b className="text-slate-900 block text-xs">Mensalidade de Serviço</b>
+                          <span className="text-[10px] text-slate-500">
+                            Vencimento: {inv.dueDate || 'Dia 05'} · {inv.paymentMethod || 'Multicaixa'}
+                          </span>
+                        </div>
+                        <div className="text-right">
+                          <b className="text-sm font-black text-slate-900 block">{kz(inv.total || inv.amount)}</b>
+                          <span className="text-[9px] font-bold uppercase text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                            {inv.status || 'Liquidada'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Download / Print Buttons */}
+                      <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200/60">
+                        <Link
+                          href={getPrintUrl('fatura', { id: inv.id, formato: 'pos' })}
+                          className="py-1.5 rounded-lg bg-slate-900 text-white font-bold text-[10.5px] hover:bg-black flex items-center justify-center gap-1 shadow-xs"
+                        >
+                          <Receipt size={12} className="text-amber-400" />
+                          <span>🧾 Talão POS (80mm)</span>
+                        </Link>
+                        <Link
+                          href={getPrintUrl('fatura', { id: inv.id, formato: 'a4' })}
+                          className="py-1.5 rounded-lg bg-white border border-slate-300 text-slate-800 font-bold text-[10.5px] hover:bg-slate-100 flex items-center justify-center gap-1"
+                        >
+                          <Printer size={12} />
+                          <span>📄 Factura A4</span>
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: MEU WI-FI & GESTÃO DA ONT (CLIENTES FIBRA) */}
+          {activeTab === 'wifi' && (
+            <div className="space-y-3.5 text-xs">
+              <div className="rounded-2xl border-2 border-blue-400 bg-gradient-to-br from-blue-900 via-indigo-950 to-slate-950 text-white p-4 space-y-3.5 shadow-md">
+                <div className="flex justify-between items-center border-b border-blue-800/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Wifi size={18} className="text-blue-400 animate-pulse" />
+                    <div>
+                      <b className="text-xs text-white block">Router Wi-Fi OSDEL FTTH</b>
+                      <span className="text-[9.5px] text-blue-300">Terminal ONT Dual-Band (2.4G & 5G)</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    SINAL ONLINE
+                  </span>
+                </div>
+
+                {/* Wi-Fi Name & Password */}
+                <div className="space-y-2.5 bg-black/40 rounded-xl p-3 border border-white/10">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="text-[10px] text-blue-200 block">Nome da Rede Wi-Fi (SSID):</span>
+                      <b className="font-mono text-sm text-white">OSDEL-FIBRA-{activeClient.houseCode || 'CASA'}</b>
+                    </div>
+                    <button
+                      onClick={() => handleCopy(`OSDEL-FIBRA-${activeClient.houseCode || 'CASA'}`, 'ssid')}
+                      className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white border border-white/20"
+                    >
+                      {copiedField === 'ssid' ? 'Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-2 border-t border-white/10">
+                    <div>
+                      <span className="text-[10px] text-blue-200 block">Palavra-passe do Wi-Fi:</span>
+                      <b className="font-mono text-sm text-amber-300">
+                        {showWifiPassword ? 'osdel@2026#segura' : '••••••••••••'}
+                      </b>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => setShowWifiPassword(!showWifiPassword)}
+                        className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20"
+                      >
+                        {showWifiPassword ? <EyeOff size={13} /> : <Eye size={13} />}
+                      </button>
+                      <button
+                        onClick={() => handleCopy('osdel@2026#segura', 'wifi_pass')}
+                        className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-[10px] font-bold text-white border border-white/20"
+                      >
+                        {copiedField === 'wifi_pass' ? 'Copiado!' : 'Copiar'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => alert('Pedido de reinicialização remota do router enviado! O equipamento sincronizará em 45 segundos.')}
+                    className="flex-1 py-2 rounded-xl bg-blue-600 text-white font-bold text-[11px] hover:bg-blue-500 shadow-xs"
+                  >
+                    Reiniciar Router
+                  </button>
+                  <button
+                    onClick={() => {
+                      setTicketForm({
+                        category: 'outros',
+                        title: 'Troca de Senha do Wi-Fi',
+                        description: `Gostaria de solicitar a alteração da minha senha do Wi-Fi para o cliente ${activeClient.fullName}.`,
+                        photoUrl: '',
+                      });
+                      setModalTicket(true);
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-white/10 text-white font-bold text-[11px] hover:bg-white/20 border border-white/20"
+                  >
+                    Pedir Nova Senha
+                  </button>
+                </div>
+              </div>
+
+              {/* Connected Devices */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-xs">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                  <b className="text-xs font-bold text-slate-800">Aparelhos Conectados Agora (4)</b>
+                  <span className="text-[10px] text-emerald-600 font-bold">4 Dispositivos</span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {[
+                    { name: 'Smart TV Sala (Samsung UHD)', ip: '192.168.1.102', band: '5 GHz' },
+                    { name: 'iPhone 14 Pro Max', ip: '192.168.1.105', band: '5 GHz' },
+                    { name: 'Computador HP Pavilion', ip: '192.168.1.110', band: '2.4 GHz' },
+                    { name: 'Tablet Samsung Galaxy', ip: '192.168.1.118', band: '2.4 GHz' },
+                  ].map((dev, i) => (
+                    <div key={i} className="flex justify-between items-center text-[11px] p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div>
+                        <b className="text-slate-900 block leading-tight">{dev.name}</b>
+                        <span className="font-mono text-[9.5px] text-slate-400">{dev.ip}</span>
+                      </div>
+                      <span className="text-[9.5px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded">
+                        {dev.band}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* TAB 2: CONTRATO & FACTURAS */}
           {activeTab === 'contrato' && (
             <div className="space-y-3 text-xs">
@@ -616,46 +998,90 @@ export function ClientMobileApp() {
             </div>
           )}
 
-          {/* TAB 5: DIAGNÓSTICO DE SINAL */}
+          {/* TAB 5: DIAGNÓSTICO DE SINAL & SPEEDTEST */}
           {activeTab === 'diagnostico' && (
             <div className="space-y-3.5 text-xs">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3">
-                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
-                  <Activity size={16} className="text-blue-600" /> Teste de Sinal & Conexão
-                </h3>
-                <p className="text-[11px] text-slate-500">
-                  Verifique os níveis de atenuação óptica (dBm) e qualidade de sinal recebido no seu terminal ou televisão.
-                </p>
+              {/* SPEEDTEST CARD */}
+              <div className="rounded-2xl border-2 border-blue-500 bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white p-4 space-y-3.5 shadow-md">
+                <div className="flex justify-between items-center border-b border-blue-800 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Activity size={18} className="text-blue-400" />
+                    <b className="text-xs text-white">Medidor de Velocidade em Tempo Real</b>
+                  </div>
+                  <span className="text-[9.5px] font-mono text-blue-300">Servidor OSDEL Luanda</span>
+                </div>
 
-                <button
-                  disabled={testingSignal}
-                  onClick={runSignalTest}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 text-white p-2.5 text-xs font-bold hover:bg-blue-700 disabled:opacity-50"
-                >
-                  <RefreshCw size={14} className={testingSignal ? 'animate-spin' : ''} />
-                  {testingSignal ? 'A medir atenuação e ping...' : 'Iniciar Diagnóstico da Linha'}
-                </button>
+                <div className="text-center py-2">
+                  <span className="text-[10px] text-blue-200 uppercase font-bold tracking-wider block">
+                    Velocidade de Download
+                  </span>
+                  <b className="text-4xl font-black font-mono text-blue-400 block mt-1 tracking-tight">
+                    {speedMetrics ? `${speedMetrics.download} Mbps` : speedTestRunning ? 'Testando...' : `${activeContract.planSpeed || '22 Mbps'}`}
+                  </b>
+                  <span className="text-[10px] text-slate-400 block mt-0.5">
+                    {speedTestRunning ? `A calibrar pacote... (${speedProgress}%)` : 'Plano contratado: Sem limites de tráfego'}
+                  </span>
+                </div>
 
-                {signalResult && (
-                  <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 space-y-2 text-[11px]">
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-slate-500">Potência Óptica (RX):</span>
-                      <b className="text-emerald-700 font-mono">{signalResult.dbm} dBm</b>
+                {speedTestRunning && (
+                  <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="bg-blue-500 h-full transition-all duration-300"
+                      style={{ width: `${speedProgress}%` }}
+                    />
+                  </div>
+                )}
+
+                {speedMetrics && (
+                  <div className="grid grid-cols-3 gap-2 bg-black/40 rounded-xl p-2.5 text-center text-[10.5px] border border-white/10">
+                    <div>
+                      <span className="text-[9px] text-slate-400 block">Upload</span>
+                      <b className="font-mono text-emerald-400">{speedMetrics.upload} Mbps</b>
                     </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-slate-500">Latência / Ping:</span>
-                      <b className="text-slate-900 font-mono">{signalResult.ping} ms</b>
+                    <div>
+                      <span className="text-[9px] text-slate-400 block">Ping</span>
+                      <b className="font-mono text-white">{speedMetrics.ping} ms</b>
                     </div>
-                    <div className="flex justify-between border-b pb-1">
-                      <span className="text-slate-500">Velocidade Medida:</span>
-                      <b className="text-blue-700 font-mono">{signalResult.download} Mbps</b>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-500">Diagnóstico:</span>
-                      <b className="text-emerald-800">{signalResult.status}</b>
+                    <div>
+                      <span className="text-[9px] text-slate-400 block">Jitter</span>
+                      <b className="font-mono text-white">{speedMetrics.jitter} ms</b>
                     </div>
                   </div>
                 )}
+
+                <button
+                  disabled={speedTestRunning}
+                  onClick={runSpeedTest}
+                  className="w-full py-2.5 rounded-xl bg-blue-600 text-white font-bold text-xs hover:bg-blue-500 disabled:opacity-50 flex items-center justify-center gap-1.5 shadow-sm transition"
+                >
+                  <RefreshCw size={14} className={speedTestRunning ? 'animate-spin' : ''} />
+                  {speedTestRunning ? 'A medir velocidade...' : 'Iniciar Teste de Velocidade'}
+                </button>
+              </div>
+
+              {/* Optical signal line quality */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                  <Activity size={16} className="text-emerald-600" /> Atenuação da Fibra / Sinal TV
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Potência óptica RX medida na porta PDO ({activeClient.pdoNumber || 'PDO-04'}):
+                </p>
+
+                <div className="rounded-xl bg-slate-50 p-3 border border-slate-200 space-y-2 text-[11px]">
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-slate-500">Potência Óptica (RX):</span>
+                    <b className="text-emerald-700 font-mono">-19.4 dBm</b>
+                  </div>
+                  <div className="flex justify-between border-b pb-1">
+                    <span className="text-slate-500">Qualidade de Conexão:</span>
+                    <b className="text-emerald-800">Excelente (Sem perdas de pacotes)</b>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Caixa PDO & Porta:</span>
+                    <b className="font-mono text-slate-900">{activeClient.pdoNumber || 'PDO-04'} (Porta 6)</b>
+                  </div>
+                </div>
               </div>
 
               {/* Digital Client Card */}
@@ -690,13 +1116,23 @@ export function ClientMobileApp() {
           </button>
 
           <button
-            onClick={() => setActiveTab('contrato')}
+            onClick={() => setActiveTab('faturas')}
             className={`flex flex-col items-center gap-1 transition ${
-              activeTab === 'contrato' ? 'text-blue-700' : 'text-slate-400'
+              activeTab === 'faturas' ? 'text-blue-700' : 'text-slate-400'
             }`}
           >
-            <FileText size={18} />
-            <span>Contrato</span>
+            <Receipt size={18} />
+            <span>Facturas</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('wifi')}
+            className={`flex flex-col items-center gap-1 transition ${
+              activeTab === 'wifi' ? 'text-blue-700' : 'text-slate-400'
+            }`}
+          >
+            <Wifi size={18} />
+            <span>Meu Wi-Fi</span>
           </button>
 
           <button
@@ -710,23 +1146,13 @@ export function ClientMobileApp() {
           </button>
 
           <button
-            onClick={() => setActiveTab('noticias')}
-            className={`flex flex-col items-center gap-1 transition ${
-              activeTab === 'noticias' ? 'text-blue-700' : 'text-slate-400'
-            }`}
-          >
-            <Bell size={18} />
-            <span>Notícias</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('diagnostico')}
             className={`flex flex-col items-center gap-1 transition ${
               activeTab === 'diagnostico' ? 'text-blue-700' : 'text-slate-400'
             }`}
           >
             <Activity size={18} />
-            <span>Sinal</span>
+            <span>Velocidade</span>
           </button>
         </nav>
       </div>
@@ -860,6 +1286,113 @@ export function ClientMobileApp() {
                   className="px-4 py-1.5 rounded-lg bg-blue-600 text-white font-bold hover:bg-blue-700"
                 >
                   Enviar Chamado
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ENVIAR COMPROVATIVO DE TRANSFERÊNCIA BANCÁRIA */}
+      {modalComprovativo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 space-y-4 text-xs shadow-2xl">
+            <div className="flex items-center justify-between border-b pb-2">
+              <div className="flex items-center gap-2">
+                <Upload size={18} className="text-emerald-600" />
+                <b className="text-sm text-slate-900">Enviar Comprovativo Bancário</b>
+              </div>
+              <button
+                onClick={() => setModalComprovativo(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-slate-600 text-[11px] leading-relaxed">
+              Anexe ou digite a referência da sua transferência Multicaixa Express, BAI Directo ou BFA Net para validação e baixa de pagamento.
+            </p>
+
+            <form onSubmit={handleSendComprovativo} className="space-y-3">
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Banco / Origem</label>
+                <select
+                  value={compBank}
+                  onChange={(e) => setCompBank(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-300 px-2 text-xs bg-white"
+                >
+                  <option value="Banco BAI">Banco BAI (BAI Directo / Depósito)</option>
+                  <option value="Banco BFA">Banco BFA (BFA Net / Depósito)</option>
+                  <option value="Multicaixa Express">Multicaixa Express</option>
+                  <option value="Banco BIC">Banco BIC</option>
+                  <option value="Banco BCI">Banco BCI</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Nº de Operação / Referência *</label>
+                <input
+                  required
+                  placeholder="Ex.: MCX-2026-98124 ou BAI-TR-4421"
+                  value={compRef}
+                  onChange={(e) => setCompRef(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-300 px-3 text-xs font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Valor Transferido (Kz) *</label>
+                <input
+                  required
+                  type="number"
+                  value={compAmount}
+                  onChange={(e) => setCompAmount(e.target.value)}
+                  className="w-full h-9 rounded-lg border border-slate-300 px-3 text-xs font-mono font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 mb-1">Anexo do Comprovativo (Foto / PDF)</label>
+                <div className="border-2 border-dashed border-slate-300 rounded-xl p-3 text-center bg-slate-50 cursor-pointer hover:bg-slate-100 transition">
+                  <Upload size={18} className="mx-auto text-slate-400 mb-1" />
+                  <span className="text-[11px] font-bold text-slate-700 block">
+                    {compFileName || 'Toque para selecionar imagem ou PDF'}
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    id="comprovativo-file-input"
+                    onChange={(e) => {
+                      if (e.target.files?.[0]) {
+                        setCompFileName(e.target.files[0].name);
+                      }
+                    }}
+                  />
+                  <label
+                    htmlFor="comprovativo-file-input"
+                    className="text-[10px] text-blue-600 font-bold cursor-pointer hover:underline block mt-0.5"
+                  >
+                    Procurar no telemóvel
+                  </label>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <button
+                  type="button"
+                  onClick={() => setModalComprovativo(false)}
+                  className="px-3 py-1.5 rounded-lg border text-slate-600 font-bold"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={compSuccess}
+                  className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white font-bold hover:bg-emerald-700 flex items-center gap-1 shadow-xs"
+                >
+                  {compSuccess ? 'A validar...' : 'Enviar Comprovativo'}
                 </button>
               </div>
             </form>

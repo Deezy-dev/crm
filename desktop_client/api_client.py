@@ -96,11 +96,14 @@ class APIClient:
             pass
         return False
 
-    def get_dashboard(self):
+    def get_dashboard(self, service=None):
         """Obtém resumo do dashboard (com fallback offline)"""
         try:
+            url = f"{self.base_url}/api/v1/dashboard/summary"
+            if service:
+                url += f"?service={service}"
             res = self.session.get(
-                f"{self.base_url}/api/v1/dashboard/summary",
+                url,
                 headers=self._get_headers(),
                 timeout=self.timeout
             )

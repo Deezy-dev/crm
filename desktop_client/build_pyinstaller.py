@@ -1,46 +1,53 @@
 """
-Script Python automatizado para compilar o executável Windows (.exe)
-Uso: python build_pyinstaller.py
+Script Python automatizado para compilar os executáveis separados:
+- python build_pyinstaller.py tv      -> Gera dist/GestaoX_TV.exe
+- python build_pyinstaller.py fibra   -> Gera dist/GestaoX_Fibra.exe
+- python build_pyinstaller.py both    -> Gera ambos os executáveis
 """
 import os
 import sys
 import subprocess
 
-def build():
-    print("==================================================")
-    print("  GESTÃO X · BUILD EXECUTÁVEL WINDOWS (PYINSTALLER)")
-    print("==================================================")
-    
-    # Verifica dependencias
-    try:
-        import customtkinter
-        import requests
-        import PyInstaller
-    except ImportError as e:
-        print(f"Erro: Dependência ausente ({e}). Instale com:")
-        print("pip install -r requirements.txt")
-        sys.exit(1)
-
-    # Localiza o caminho de dados do CustomTkinter para incluir no binário
-    ctk_path = os.path.dirname(customtkinter.__file__)
-    
+def compile_target(name, script_file):
+    print(f"\n>> Compilando {name} a partir de {script_file}...")
     cmd = [
         sys.executable, "-m", "PyInstaller",
         "--noconfirm",
-        "--onefile",      # Gera executável único (.exe)
-        "--windowed",     # Não abre janela de terminal preta (GUI nativa Windows)
-        "--name=GestaoX_Desktop",
+        "--onefile",
+        "--windowed",
+        f"--name={name}",
         "--collect-all=customtkinter",
-        "main.py"
+        script_file
     ]
-    
-    print(f"Executando comando de compilação:\n{' '.join(cmd)}\n")
-    result = subprocess.run(cmd)
-    
-    if result.returncode == 0:
-        print("\n>> SUCESSO! Executável gerado na pasta 'dist/GestaoX_Desktop/'")
+    res = subprocess.run(cmd)
+    if res.returncode == 0:
+        print(f">> SUCESSO: dist/{name}.exe criado!")
+        return True
     else:
-        print("\n>> Erro durante a compilação do PyInstaller.")
+        print(f">> ERRO ao compilar {name}.")
+        return False
+
+def main():
+    print("==================================================")
+    print("  GESTÃO X · BUILD EXECUTÁVEIS WINDOWS SEPARADOS")
+    print("==================================================")
+    
+    target = sys.argv[1].lower() if len(sys.argv) > 1 else "both"
+    
+    if target in ["tv", "cabo"]:
+        compile_target("GestaoX_TV", "main_tv.py")
+    elif target in ["fibra", "internet"]:
+        compile_target("GestaoX_Fibra", "main_fibra.py")
+    else:
+        # Compila ambos
+        ok_tv = compile_target("GestaoX_TV", "main_tv.py")
+        ok_fibra = compile_target("GestaoX_Fibra", "main_fibra.py")
+        print("\n==================================================")
+        if ok_tv and ok_fibra:
+            print(">> Ambos os executáveis foram compilados em 'dist/':")
+            print("   - dist/GestaoX_TV.exe")
+            print("   - dist/GestaoX_Fibra.exe")
+        print("==================================================")
 
 if __name__ == "__main__":
-    build()
+    main()

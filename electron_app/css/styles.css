@@ -900,3 +900,108 @@ body {
   font-size: 12px;
   display: none;
 }
+
+/* ==========================================================================
+   ESTILOS DE IMPRESSÃO: FATURA A4 E TALÃO TÉRMICO POS (80MM / 58MM)
+   ========================================================================== */
+.pos-receipt-paper {
+  background: #ffffff;
+  color: #000000;
+  width: 100%;
+  max-width: 320px;
+  margin: 0 auto;
+  padding: 14px 12px;
+  font-family: "Courier New", Courier, monospace, monospace;
+  font-size: 11px;
+  line-height: 1.25;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-sizing: border-box;
+}
+
+.a4-invoice-paper {
+  background: #ffffff;
+  color: #1e293b;
+  width: 100%;
+  max-width: 620px;
+  margin: 0 auto;
+  padding: 24px;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  font-size: 12px;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .titlebar,
+  .sidebar,
+  .top-bar,
+  .content-area,
+  .modal-header,
+  .modal-footer,
+  .toast-container {
+    display: none !important;
+  }
+  
+  .modal-overlay {
+    position: static !important;
+    display: block !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+  
+  .modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+    transform: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  .modal-body {
+    padding: 0 !important;
+    background: transparent !important;
+    overflow: visible !important;
+  }
+  
+  body.print-mode-pos @page {
+    size: 80mm auto !important;
+    margin: 2mm !important;
+  }
+  
+  body.print-mode-pos .pos-receipt-paper {
+    max-width: 80mm !important;
+    width: 80mm !important;
+    box-shadow: none !important;
+    padding: 2mm !important;
+    margin: 0 !important;
+  }
+
+  body.print-mode-a4 @page {
+    size: A4 portrait !important;
+    margin: 10mm !important;
+  }
+
+  body.print-mode-a4 .a4-invoice-paper {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+

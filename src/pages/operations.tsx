@@ -168,9 +168,13 @@ function StatusPill({ children }: { children: ReactNode }) {
 function PrintFrame({
   children,
   close,
+  toolbarExtra,
+  isPos = false,
 }: {
   children: ReactNode;
   close: () => void;
+  toolbarExtra?: ReactNode;
+  isPos?: boolean;
 }) {
   useEffect(() => {
     document.body.classList.add('printing-document');
@@ -179,19 +183,48 @@ function PrintFrame({
 
   return createPortal(
     (
-    <div className="print-backdrop fixed inset-0 z-[60] overflow-auto bg-[#142f35]/55 p-3 backdrop-blur-sm sm:p-8">
-      <div className="print-toolbar mx-auto mb-3 flex max-w-[860px] items-center justify-between rounded-xl bg-[hsl(var(--card))] px-4 py-3 shadow-lg">
-        <span className="text-sm font-bold">Pré-visualização do documento</span>
-        <div className="flex gap-2">
+    <div className={`print-backdrop fixed inset-0 z-[60] overflow-auto bg-[#142f35]/55 p-3 backdrop-blur-sm sm:p-8 ${isPos ? 'pos-print-mode' : ''}`}>
+      {isPos && (
+        <style>{`
+          @media print {
+            @page {
+              size: 80mm auto !important;
+              margin: 2mm 3mm !important;
+            }
+            body {
+              background: white !important;
+              color: black !important;
+              padding: 0 !important;
+            }
+            .print-paper {
+              max-width: 80mm !important;
+              width: 100% !important;
+              box-shadow: none !important;
+              padding: 0 !important;
+              margin: 0 !important;
+            }
+            .print-toolbar, .print-backdrop {
+              background: transparent !important;
+              padding: 0 !important;
+            }
+          }
+        `}</style>
+      )}
+      <div className={`print-toolbar mx-auto mb-3 flex items-center justify-between rounded-xl bg-[hsl(var(--card))] px-4 py-3 shadow-lg ${isPos ? 'max-w-[420px]' : 'max-w-[860px]'}`}>
+        <span className="text-xs font-bold text-slate-800">
+          {isPos ? '🧾 Talão Térmico POS (80mm)' : '📄 Factura Oficial (A4)'}
+        </span>
+        <div className="flex items-center gap-2">
+          {toolbarExtra}
           <ActionButton variant="outline" onClick={close}>
             <X size={15} /> Fechar
           </ActionButton>
           <ActionButton onClick={() => window.print()}>
-            <Printer size={15} /> Imprimir / PDF
+            <Printer size={15} /> Imprimir {isPos ? 'Talão POS' : 'A4'}
           </ActionButton>
         </div>
       </div>
-      <div className="print-paper mx-auto max-w-[860px] bg-white text-[#26343b] shadow-2xl">
+      <div className={`print-paper mx-auto bg-white text-[#26343b] shadow-2xl transition-all ${isPos ? 'max-w-[360px] p-4 font-mono rounded-lg border border-dashed border-slate-300' : 'max-w-[860px] rounded-none'}`}>
         {children}
       </div>
     </div>
@@ -211,6 +244,7 @@ export function InvoicePreview({
   settings: AnyRecord;
   close: () => void;
 }) {
+  const [format, setFormat] = useState<'a4' | 'pos'>('a4');
   const total = Number(payment.amount || 0) + Number(payment.penalty || 0);
   const number = payment.invoiceNumber || `${settings.invoicePrefix || 'FT'}-${String(payment.id).padStart(5, '0')}`;
   const banks = settings.bankAccounts || [
@@ -218,9 +252,100 @@ export function InvoicePreview({
     { name: 'Banco BFA', iban: 'AO06.0006.0000.9876.5432.1098.7', account: '98765432/01/001', holder: settings.companyName || 'OSDEL TECNOLOGIA' },
   ];
 
+  const formatSelector = (
+    <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg border border-slate-300 mr-1">
+      <button
+        type="button"
+        onClick={() => setFormat('a4')}
+        className={`px-2.5 py-1 text-xs font-bold rounded-md transition ${format === 'a4' ? 'bg-white shadow text-blue-700' : 'text-slate-600 hover:text-slate-900'}`}
+      >
+        📄 Formato A4
+      </button>
+      <button
+        type="button"
+        onClick={() => setFormat('pos')}
+        className={`px-2.5 py-1 text-xs font-bold rounded-md transition ${format === 'pos' ? 'bg-white shadow text-emerald-700' : 'text-slate-600 hover:text-slate-900'}`}
+      >
+        🧾 Térmica POS
+      </button>
+    </div>
+  );
+
   return (
-    <PrintFrame close={close}>
-      <div className="document-paper p-8 sm:p-12 text-[#1c2930]">
+    <PrintFrame close={close} toolbarExtra={formatSelector} isPos={format === 'pos'}>
+      {format === 'pos' ? (
+        /* FORMATO POS / TÉRMICA 80MM / 58MM */
+        <div className="pos-thermal-receipt mx-auto max-w-[320px] bg-white p-3 font-mono text-[11px] leading-tight text-black print:max-w-none print:p-0">
+          <div className="text-center pb-2 border-b border-dashed border-black">
+            <div className="flex justify-center pb-1.5">
+              <img
+                src={getCompanyLogo(settings.logoUrl)}
+                alt="Logótipo OSDEL"
+                className="h-12 w-12 object-contain mx-auto"
+                style={{ filter: 'grayscale(100%) contrast(180%)' }}
+              />
+            </div>
+            <p className="text-base font-black tracking-wider uppercase">{settings.companyName || 'OSDEL TECNOLOGIA'}</p>
+            <p className="text-[10px] uppercase font-bold text-slate-700">{settings.companySubtitle || 'TV CABO · INTERNET FIBRA'}</p>
+            <p className="text-[9px] mt-0.5">NIF: {settings.companyNif || '5417089214'}</p>
+            <p className="text-[9px]">Tel: {settings.companyPhone || '+244 923 000 000'}</p>
+            <p className="text-[9px]">{settings.companyAddress || 'Luanda, Angola'}</p>
+          </div>
+          
+          <div className="py-2 border-b border-dashed border-black text-center">
+            <p className="text-xs font-black uppercase tracking-wider">
+              {payment.documentType === 'proforma' ? 'FACTURA PROFORMA' : payment.status === 'anulada' ? 'FACTURA ANULADA' : 'FACTURA / RECIBO'}
+            </p>
+            <p className="text-sm font-black tracking-widest mt-0.5">{number}</p>
+            <p className="text-[9px] mt-0.5">Data: {formatDate(payment.paidAt || payment.issuedAt || new Date().toISOString())}</p>
+          </div>
+
+          <div className="py-2 border-b border-dashed border-black space-y-0.5">
+            <p><b>CLIENTE:</b> {client?.fullName || payment.clientName || 'Consumidor Final'}</p>
+            <p><b>CÓDIGO:</b> {client?.code || '—'}</p>
+            {client?.houseCode && <p><b>CASA/BLOCO:</b> {client.houseCode}</p>}
+            {client?.pdoNumber && <p><b>CAIXA PDO:</b> {client.pdoNumber}</p>}
+            <p><b>BI/NIF:</b> {client?.documentNumber || client?.nif || 'Consumidor Final'}</p>
+            <p><b>TEL:</b> {client?.phone || '—'}</p>
+            {client?.neighborhood && <p><b>BAIRRO:</b> {client.neighborhood}</p>}
+          </div>
+
+          <div className="py-2 border-b border-dashed border-black">
+            <div className="flex justify-between font-bold text-[10px] uppercase border-b border-black/30 pb-1 mb-1">
+              <span>DESCRIÇÃO</span>
+              <span>VALOR</span>
+            </div>
+            <div className="flex justify-between text-[10.5px]">
+              <span className="truncate max-w-[200px]">{payment.itemDescription || `Mensalidade (${payment.paymentMonth || 'Corrente'})`}</span>
+              <span className="font-bold">{money(payment.amount)}</span>
+            </div>
+            {Number(payment.penalty || 0) > 0 && (
+              <div className="flex justify-between mt-1 text-[10px] text-amber-900">
+                <span>Multa por Atraso</span>
+                <span>{money(payment.penalty)}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="py-2.5 border-b-2 border-black text-right">
+            <p className="text-[10px] uppercase font-bold text-slate-700">VALOR TOTAL PAGO:</p>
+            <p className="text-2xl font-black">{money(total)}</p>
+            <p className="text-[9.5px] mt-0.5 font-bold uppercase">Forma: {payment.method || 'Multicaixa'}</p>
+            {payment.reference && <p className="text-[9px]">Ref: {payment.reference}</p>}
+            <p className="text-[9px] font-semibold text-emerald-800 mt-0.5">Estado: LIQUIDADO / EM DIA</p>
+          </div>
+
+          <div className="pt-2.5 text-center text-[9px] leading-tight text-slate-700 space-y-0.5">
+            <p className="font-bold uppercase">Obrigado pela sua preferência!</p>
+            <p>Guarde este talão como comprovativo de pagamento e garantia de sinal.</p>
+            <p className="pt-1 font-mono text-[8px] text-slate-500">
+              Operador: {payment.operator || 'Caixa'} · Sistema Gestão X
+            </p>
+          </div>
+        </div>
+      ) : (
+        /* FORMATO CLÁSSICO A4 */
+        <div className="document-paper p-8 sm:p-12 text-[#1c2930]">
         {/* Header */}
         <div className="flex items-start justify-between gap-6 border-b-2 border-[#0b4a8a] pb-6">
           <div className="flex items-center gap-4">
@@ -400,10 +525,10 @@ export function InvoicePreview({
               <span className="text-[8px] text-[#5d6870] block">Carimbo & Chancela Digital</span>
               <span className="font-mono text-[9px] text-[#0b4a8a] font-bold block mt-0.5">AUTENTICADO</span>
             </div>
-            <p className="mt-1 text-[10px]">Operador: <b>{payment.operator || 'Atendimento OSDEL'}</b></p>
           </div>
         </div>
       </div>
+      )}
     </PrintFrame>
   );
 }

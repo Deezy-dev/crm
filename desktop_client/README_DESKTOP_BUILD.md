@@ -1,64 +1,92 @@
-# GUIA DE COMPILAÇÃO DO CLIENTE DESKTOP WINDOWS (PYINSTALLER)
-============================================================
+# GUIA DE COMPILAÇÃO: EXECUTÁVEIS SEPARADOS (TV E INTERNET FIBRA)
+================================================================================
+Gestão X · Aplicativos Desktop Nativos Windows (.exe)
+================================================================================
 
-Este guia explica como testar e compilar o aplicativo executável do **Gestão X Desktop** para Windows (`.exe`), que se conecta à API no PythonAnywhere.
+Para garantir que o aplicativo seja **super leve, ágil e focado na operação**, o sistema agora disponibiliza **dois executáveis separados**:
+
+1. **`GestaoX_TV.exe`**: Módulo dedicado exclusivamente para **TV por Cabo Comunitária**.
+2. **`GestaoX_Fibra.exe`**: Módulo dedicado exclusivamente para **Internet Fibra Óptica (ISP)**.
+
+Ambos conectam-se à mesma API REST Flask no PythonAnywhere, mas cada um carrega apenas as telas, dados e campos necessários para a sua atividade.
 
 ---
 
-## 1. Pré-Requisitos no Computador Windows
-- Python 3.10 ou superior instalado (Marque a opção *"Add Python to PATH"* durante a instalação).
-- Acesso à internet para instalar as bibliotecas via `pip`.
+## 1. COMPILAÇÃO RÁPIDA EM 1 CLIQUE NO WINDOWS (ARQUIVOS .BAT)
+
+Na pasta `desktop_client/`, você encontrará 3 scripts automáticos:
+
+* 👉 **`build_tv_exe.bat`**: Compila e gera o **`dist\GestaoX_TV.exe`**.
+* 👉 **`build_fibra_exe.bat`**: Compila e gera o **`dist\GestaoX_Fibra.exe`**.
+* 👉 **`build_both_exe.bat`**: Compila **ambos** os executáveis em sequência.
+
+Basta dar um duplo clique no script desejado!
 
 ---
 
-## 2. Instalação das Dependências
-Abra o prompt de comando (CMD ou PowerShell) na pasta `desktop_client/` e execute:
+## 2. COMPILAÇÃO MANUAL VIA TERMINAL (PYINSTALLER)
 
+Abra o prompt de comando (CMD ou PowerShell) na pasta `desktop_client`:
+
+### Passo 1: Instalar as Dependências
 ```bash
 pip install -r requirements.txt
 ```
 
----
-
-## 3. Executar o Aplicativo em Modo de Desenvolvimento
-Para testar a interface gráfica antes de compilar:
-
+### Passo 2: Compilar o Executável de TV
 ```bash
-python main.py
-```
-- Você verá a janela de login com tema escuro moderno do **CustomTkinter**.
-- Insira o usuário `admin`, senha `admin123` e a URL da sua API no PythonAnywhere (`https://seu_usuario.pythonanywhere.com`) ou `http://localhost:5000`.
-
----
-
-## 4. Compilar o Executável Windows (.exe)
-
-### Opção A: Usando o Script Batch Automático
-Dê um duplo clique no arquivo:
-`build_exe.bat`
-
-### Opção B: Comando Direto do PyInstaller
-No terminal, execute o comando oficial:
-
-```bash
-pyinstaller --noconfirm --onefile --windowed --name "GestaoX_Desktop" --collect-all customtkinter main.py
+pyinstaller --noconfirm --onefile --windowed --name "GestaoX_TV" --collect-all customtkinter main_tv.py
 ```
 
-### Explicação dos Parâmetros:
-- `--onefile`: Empacota todo o aplicativo, bibliotecas e interpretador num **único arquivo executável `.exe`**.
-- `--windowed`: Executa como aplicativo de interface gráfica nativo, sem abrir aquela janela preta de prompt do DOS.
-- `--collect-all customtkinter`: Garante que todos os temas visuais, fontes e ícones do CustomTkinter sejam empacotados dentro do `.exe`.
+### Passo 3: Compilar o Executável de Internet Fibra
+```bash
+pyinstaller --noconfirm --onefile --windowed --name "GestaoX_Fibra" --collect-all customtkinter main_fibra.py
+```
 
 ---
 
-## 5. Onde Fica o Arquivo Executável Gerado?
-Após a compilação, o arquivo estará pronto em:
-`dist\GestaoX_Desktop.exe`
+## 3. DIFERENÇAS ENTRE OS DOIS APLICATIVOS
 
-Você pode copiar esse arquivo `GestaoX_Desktop.exe` para qualquer computador com Windows 10 ou 11. O executável é independente e não requer que o cliente tenha Python instalado!
+| Recurso | `GestaoX_TV.exe` (TV a Cabo) | `GestaoX_Fibra.exe` (Internet Fibra) |
+| :--- | :--- | :--- |
+| **Identidade Visual** | Tema Azul/Ciano com badge `📺 TV` | Tema Verde Esmeralda com badge `🌐 FIBRA` |
+| **Filtro de Clientes** | Lista apenas assinantes de TV por cabo | Lista clientes de Fibra Óptica e planos combo |
+| **Campos Técnicos** | Bloco, Código de Casa, Tap / Divisor, Pontos de TV | Caixa PDO, Porta, Serial ONU / ONT, Plano de Megas |
+| **Ações de Sinal** | Controle de Corte Físico e Religação de TV | Bloqueio Lógico de Internet por falta de pagamento |
+| **Mensalidade Padrão** | Fixa para TV (Ex: 4.000 Kz) | Planos de velocidade (Ex: 8.500 Kz a 25.000 Kz) |
+| **Tamanho do .exe** | Leve e otimizado (~25 MB standalone) | Leve e otimizado (~25 MB standalone) |
 
 ---
 
-## 6. Recursos Resilientes Incluídos
-- **Cache Local SQLite:** Se a internet oscilar ou cair temporariamente, o aplicativo continua abrindo a lista de clientes e dados do dashboard salvos no arquivo `local_cache.db`.
-- **Renovação Automática JWT:** Tokens de acesso expirados são renovados em segundo plano via Refresh Token sem interromper o trabalho do operador.
+## 4. ONDE FICAM OS EXECUTÁVEIS APÓS A COMPILAÇÃO?
+
+Após a execução do build, os arquivos `.exe` estarão prontos para uso na pasta `dist/`:
+- `desktop_client\dist\GestaoX_TV.exe`
+- `desktop_client\dist\GestaoX_Fibra.exe`
+
+Você pode copiar esses arquivos `.exe` diretamente para um pendrive e rodar em qualquer computador com Windows 10 ou Windows 11. **Não é necessário ter Python instalado na máquina do cliente ou operador.**
+
+---
+
+## 5. SISTEMA DE IMPRESSÃO DE FACTURAS: DUAL FORMATO
+
+Ambos os aplicativos (`GestaoX_TV.exe` e `GestaoX_Fibra.exe`), assim como o app Electron e a interface Web, contam com **dois formatos de impressão integrados**:
+
+### 🧾 1. Formato Talão Térmico POS (80mm / 58mm)
+* **Destinado a:** Impressoras térmicas não fiscais de recibos/talões (Epson TM-T20, Bematech, Elgin, Xprinter, POS-80, etc.).
+* **Características:**
+  - Layout compacto de 72mm a 80mm com tipografia monoespaçada de alto contraste (preto puro).
+  - Linhas tracejadas de corte limpo sem desbotar.
+  - Dados essenciais do assinante (Código, Nome, NIF/BI, Morada, Casa/Bloco, PDO/ONU).
+  - Discriminação da Mensalidade e Multa por atraso.
+  - Valor total em destaque grande, forma de liquidação e referência.
+  - Mensagem de garantia de sinal e rodapé de agradecimento.
+
+### 📄 2. Formato Factura Oficial A4
+* **Destinado a:** Impressoras laser ou jato de tinta em folha A4 completa.
+* **Características:**
+  - Cabeçalho timbrado oficial com logótipo, NIF, dados legais e de contacto.
+  - Tabela discriminativa detalhada com colunas de Artigo, Quantidade, Preço Unitário, Isenção IVA (Art. 12 CIVA) e Total.
+  - Caixa de enquadramento fiscal e coordenadas bancárias oficiais (Banco BAI e BFA com IBAN).
+  - Áreas reservadas para carimbo da empresa e assinatura do assinante.
+

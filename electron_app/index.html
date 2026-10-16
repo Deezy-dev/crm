@@ -621,6 +621,33 @@
     </div>
   </div>
 
+  <!-- Modal Imprimir Fatura (Dual: A4 e Térmica POS) -->
+  <div class="modal-overlay" id="modal-print-invoice">
+    <div class="modal-card" style="max-width: 680px;" id="print-modal-card">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <h3 id="print-modal-title">Imprimir Fatura</h3>
+          <div class="format-selector" style="display: flex; gap: 4px; background: rgba(0,0,0,0.3); padding: 3px; border-radius: 6px;">
+            <button type="button" class="btn btn-sm btn-primary" id="btn-format-a4" style="font-size: 11px; padding: 3px 8px;">📄 Formato A4</button>
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-format-pos" style="font-size: 11px; padding: 3px 8px;">🧾 Térmica POS</button>
+          </div>
+        </div>
+        <button class="modal-close" data-close-modal="modal-print-invoice">&times;</button>
+      </div>
+      <div class="modal-body" style="background: #1e293b; padding: 16px; overflow-y: auto; max-height: 60vh;">
+        <!-- Container de Pré-visualização Dinâmica -->
+        <div id="print-preview-container"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-close-modal="modal-print-invoice">Fechar</button>
+        <button type="button" class="btn btn-primary" id="btn-trigger-print">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+          <span id="btn-trigger-print-text">Imprimir (Ctrl + P)</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Container de Toasts -->
   <div class="toast-container" id="toast-container"></div>
 

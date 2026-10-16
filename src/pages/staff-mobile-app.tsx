@@ -31,6 +31,16 @@ import {
   Info,
   Banknote,
   AlertTriangle,
+  Receipt,
+  Lock,
+  Wrench,
+  Boxes,
+  Activity,
+  Sliders,
+  Sparkle,
+  SlidersHorizontal,
+  Search,
+  RefreshCw,
 } from 'lucide-react';
 import { enqueueSyncMutation } from '@/lib/offline-sync';
 import { SyncStatusPill } from '@/components/sync-status-pill';
@@ -61,7 +71,19 @@ import {
   reviewTechnicianLoan,
   cancelTechnicianLoan,
 } from '@/lib/technician-loans';
-import { useListUsers } from '@/lib/local-api';
+import {
+  useListUsers,
+  useListClients,
+  useListInvoices,
+  useListPayments,
+  useListCashClosures,
+  useGetSettings,
+  useCreateInvoice,
+  useCreatePayment,
+  useUpdateClient,
+} from '@/lib/local-api';
+import { getPrintUrl } from '@/lib/printer';
+import { getCompanyLogo } from '@/lib/company-logo';
 import { Link } from 'wouter';
 
 const kz = (value: unknown) =>
@@ -73,14 +95,36 @@ const kz = (value: unknown) =>
     .format(Number(value || 0))
     .replace('AOA', 'Kz');
 
+export type StaffTab =
+  | 'agenda'
+  | 'missoes'
+  | 'material'
+  | 'salario'
+  | 'clientes'
+  | 'faturas'
+  | 'caixa'
+  | 'acordos'
+  | 'admin_painel';
+
 export function StaffMobileApp() {
   const usersQuery = useListUsers();
+  const clientsQuery = useListClients();
+  const invoicesQuery = useListInvoices();
+  const paymentsQuery = useListPayments();
+  const closuresQuery = useListCashClosures();
+  const settingsQuery = useGetSettings();
+  const createInvoiceMutation = useCreateInvoice();
+  const createPaymentMutation = useCreatePayment();
+
   const allUsers = usersQuery.data || [];
   const staffList = allUsers.filter((u: any) => u.active !== false);
+  const clients = clientsQuery.data?.items || [];
+  const invoices = invoicesQuery.data?.items || [];
+  const closures = closuresQuery.data || [];
+  const settings = settingsQuery.data || {};
 
   // Active logged-in user in the mobile staff app
   const [activeUserId, setActiveUserId] = useState<number>(() => {
-    // Default to Mestre Job (Senior Technician)
     const mestre = staffList.find((u: any) => u.name?.includes('Job'));
     return mestre ? mestre.id : staffList[0]?.id || 1;
   });
@@ -89,7 +133,7 @@ export function StaffMobileApp() {
     id: 1,
     name: 'Mestre Job (Job Baptista)',
     username: 'mestre.job',
-    role: 'operador',
+    role: 'tecnico',
     jobTitle: 'Mestre de Piquete & Técnico Sénior',
     salaryBase: 190000,
     foodAllowance: 35000,
@@ -99,12 +143,33 @@ export function StaffMobileApp() {
     phone: '923 881 902',
   };
 
-  const isTechOnly = currentUser.jobTitle?.includes('Técnico') || currentUser.jobTitle?.includes('Mestre');
-  const isAdminOrOperator = currentUser.role === 'admin' || currentUser.jobTitle?.includes('Operador') || currentUser.jobTitle?.includes('Admin');
+  // Strictly enforce role-based access:
+  // - 'tecnico': ONLY sees assigned work orders, routes, van stock, and personal salary. CANNOT generate invoices or view company finances!
+  // - 'operador': Full operational CRM access (Clients, Invoices, POS thermal / A4 print, Cash closure, Work orders, Promises).
+  // - 'admin': Full access + Executive metrics, profit margins, and user permissions / system settings.
+  const isTechnician =
+    currentUser.role === 'tecnico' ||
+    currentUser.jobTitle?.includes('Técnico') ||
+    currentUser.jobTitle?.includes('Mestre') ||
+    currentUser.department === 'Técnico';
+  const isAdmin =
+    currentUser.role === 'admin' ||
+    currentUser.username === 'admin' ||
+    currentUser.username === 'deezy';
+  const isOperator = (!isTechnician && !isAdmin) || currentUser.role === 'operador';
+  const isAdminOrOperator = isAdmin || isOperator;
 
   // Tabs for mobile app
-  const [activeTab, setActiveTab] = useState<'agenda' | 'missoes' | 'salario' | 'acordos'>('agenda');
+  const [activeTab, setActiveTab] = useState<StaffTab>(() => (isTechnician ? 'agenda' : 'clientes'));
   const [fullscreenMode, setFullscreenMode] = useState(false);
+  const [securityNotice, setSecurityNotice] = useState<string | null>(null);
+
+  // Auto adjust tab when switching users to prevent unauthorized view
+  useEffect(() => {
+    if (isTechnician && ['clientes', 'faturas', 'caixa', 'admin_painel'].includes(activeTab)) {
+      setActiveTab('agenda');
+    }
+  }, [activeUserId, isTechnician]);
 
   // Stored state
   const [missions, setMissions] = useState<TeamMission[]>(() => getStoredMissions());
@@ -112,8 +177,25 @@ export function StaffMobileApp() {
   const [promises, setPromises] = useState<PaymentPromise[]>(() => getStoredPromises());
   const [loans, setLoans] = useState<TechnicianLoan[]>(() => getTechnicianLoans());
 
-  // Modal for requesting loan
+  // Search & filter states inside mobile app
+  const [clientSearch, setClientSearch] = useState('');
+  const [invoiceSearch, setInvoiceSearch] = useState('');
+
+  // Modals inside mobile app
+  const [modalNewInvoice, setModalNewInvoice] = useState(false);
   const [modalRequestLoan, setModalRequestLoan] = useState(false);
+  const [modalPrintChoice, setModalPrintChoice] = useState<any | null>(null);
+
+  // New Invoice Form (for Operators / Admin)
+  const [invFormClientId, setInvFormClientId] = useState('');
+  const [invFormDesc, setInvFormDesc] = useState('Mensalidade de Serviço OSDEL');
+  const [invFormAmount, setInvFormAmount] = useState('4000');
+  const [invFormPenalty, setInvFormPenalty] = useState('0');
+  const [invFormMethod, setInvFormMethod] = useState('multicaixa');
+
+  // Technician signal diagnosis simulation state
+  const [opticalReading, setOpticalReading] = useState<{ [key: string]: number }>({});
+
   const [loanAmount, setLoanAmount] = useState('35000');
   const [loanPurpose, setLoanPurpose] = useState('Emergência Médica / Saúde Familiar');
   const [loanInstallments, setLoanInstallments] = useState(1);
@@ -268,6 +350,61 @@ export function StaffMobileApp() {
     }
   };
 
+  // Handle Operator / Admin creating an invoice via Mobile App
+  const handleCreateInvoiceSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isTechnician) {
+      alert('Acesso negado: Técnicos não têm permissão para gerar facturas.');
+      return;
+    }
+
+    const targetClient = clients.find((c: any) => c.id === Number(invFormClientId)) || clients[0];
+    if (!targetClient) {
+      alert('Seleccione um cliente válido.');
+      return;
+    }
+
+    const amt = Number(invFormAmount);
+    const pen = Number(invFormPenalty || 0);
+    const total = amt + pen;
+    const invNum = `FT-${new Date().getFullYear()}/${String(Math.floor(1000 + Math.random() * 9000))}`;
+
+    createInvoiceMutation.mutate(
+      {
+        clientId: targetClient.id,
+        invoiceNumber: invNum,
+        amount: amt,
+        penalty: pen,
+        total: total,
+        status: 'paga',
+        description: invFormDesc,
+        dueDate: new Date().toISOString().slice(0, 10),
+        paymentMethod: invFormMethod,
+        operator: currentUser.name,
+      },
+      {
+        onSuccess: () => {
+          invoicesQuery.refetch();
+          setModalNewInvoice(false);
+          setModalPrintChoice({
+            invoiceNumber: invNum,
+            clientName: targetClient.fullName,
+            amount: amt,
+            penalty: pen,
+            total: total,
+            dueDate: new Date().toLocaleDateString('pt-AO'),
+            paymentMethod: invFormMethod,
+            operator: currentUser.name,
+            client: targetClient,
+          });
+        },
+        onError: (err: any) => {
+          alert(`Erro ao emitir factura: ${err.message || 'Tente novamente'}`);
+        },
+      }
+    );
+  };
+
   return (
     <div className={`min-h-screen ${fullscreenMode ? 'bg-slate-950 p-0' : 'p-4 md:p-8 bg-slate-100 flex flex-col items-center'}`}>
       {/* Top Controls Bar */}
@@ -368,13 +505,138 @@ export function StaffMobileApp() {
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
-            <span className="text-slate-300 font-bold truncate max-w-[200px]">
-              Olá, {currentUser.name}
-            </span>
+          <div className="mt-2.5 flex items-center justify-between pt-2 border-t border-slate-800 text-xs">
+            <div className="flex items-center gap-1.5 truncate max-w-[210px]">
+              <span className="text-slate-300 font-bold truncate">
+                {currentUser.name.split(' ')[0]} ({currentUser.username})
+              </span>
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase ${
+                  isAdmin
+                    ? 'bg-purple-900/80 text-purple-200 border border-purple-500/30'
+                    : isOperator
+                    ? 'bg-blue-900/80 text-blue-200 border border-blue-500/30'
+                    : 'bg-amber-900/80 text-amber-200 border border-amber-500/30'
+                }`}
+              >
+                {isAdmin ? 'ADMIN' : isOperator ? 'OPERADOR' : 'TÉCNICO CAMPO'}
+              </span>
+            </div>
             <span className="text-[10px] text-slate-400">
               {new Date().toLocaleDateString('pt-AO')}
             </span>
+          </div>
+
+          {/* Quick Module Switcher Chips */}
+          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-[11px]">
+            {isTechnician ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('agenda')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'agenda' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Calendar size={12} /> Agenda
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('missoes')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'missoes' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Scissors size={12} /> Piquetes Ruas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('material')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'material' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Wrench size={12} /> Carrinha & OPM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('salario')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'salario' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <DollarSign size={12} /> Meu Salário
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('acordos')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'acordos' ? 'bg-amber-400 text-slate-950' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <ShieldCheck size={12} /> Acordos
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('clientes')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'clientes' ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Users size={12} /> Assinantes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('faturas')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'faturas' ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Receipt size={12} /> Facturas & POS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('caixa')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'caixa' ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <DollarSign size={12} /> Caixa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('missoes')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'missoes' ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <Scissors size={12} /> Piquetes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('acordos')}
+                  className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                    activeTab === 'acordos' ? 'bg-blue-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                  }`}
+                >
+                  <ShieldCheck size={12} /> Acordos
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('admin_painel')}
+                    className={`px-2 py-1 rounded-lg font-bold shrink-0 transition flex items-center gap-1 ${
+                      activeTab === 'admin_painel' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-purple-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Sliders size={12} /> Painel Admin
+                  </button>
+                )}
+              </>
+            )}
           </div>
         </header>
 
@@ -930,6 +1192,455 @@ export function StaffMobileApp() {
               )}
             </div>
           )}
+
+          {/* SECURITY SHIELD FOR TECHNICIANS ATTEMPTING RESTRICTED TABS */}
+          {isTechnician && ['clientes', 'faturas', 'caixa', 'admin_painel'].includes(activeTab) && (
+            <div className="rounded-2xl border-2 border-red-300 bg-red-50 p-6 text-center space-y-3">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-red-100 text-red-600 mx-auto">
+                <Lock size={24} />
+              </div>
+              <b className="text-sm font-extrabold text-red-950 block">Acesso Reservado ao Perfil Operador & Administrador</b>
+              <p className="text-xs text-red-800 leading-relaxed max-w-xs mx-auto">
+                O seu perfil de <b>Técnico de Campo</b> está configurado com permissões estritas para intervenções de piquete, ordens de serviço, carrinha e vencimento individual. A emissão de facturas, visualização de finanças e definições globais não estão autorizadas para o seu utilizador.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('agenda')}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-black shadow-sm"
+              >
+                <Calendar size={14} /> Voltar à Minha Agenda
+              </button>
+            </div>
+          )}
+
+          {/* TAB 5: CLIENTES & ASSINANTES (OPERADOR & ADMIN) */}
+          {activeTab === 'clientes' && !isTechnician && (
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <b className="text-xs font-bold uppercase text-slate-500">Carteira de Assinantes</b>
+                  <p className="text-[10px] text-slate-400">Total: {clients.length} clientes registados</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setInvFormClientId(String(clients[0]?.id || ''));
+                    setModalNewInvoice(true);
+                  }}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-[11px] shadow-sm hover:bg-blue-700"
+                >
+                  <Plus size={13} /> Nova Factura
+                </button>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={clientSearch}
+                  onChange={(e) => setClientSearch(e.target.value)}
+                  placeholder="Pesquisar por nome, código, rua, casa ou PDO..."
+                  className="w-full h-9 pl-8 pr-3 rounded-xl border border-slate-300 bg-white text-xs font-medium placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Clients List */}
+              <div className="space-y-2.5">
+                {clients
+                  .filter((c: any) => {
+                    if (!clientSearch.trim()) return true;
+                    const q = clientSearch.toLowerCase();
+                    return (
+                      c.fullName?.toLowerCase().includes(q) ||
+                      c.code?.toLowerCase().includes(q) ||
+                      c.phone?.includes(q) ||
+                      c.address?.toLowerCase().includes(q) ||
+                      c.houseCode?.toLowerCase().includes(q) ||
+                      c.pdoNumber?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((c: any) => {
+                    const isLate = c.status === 'late' || c.status === 'atrasado';
+                    const isCut = c.status === 'cut' || c.status === 'cortado';
+                    const isTv = c.serviceType === 'tv';
+                    return (
+                      <div
+                        key={c.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 shadow-xs hover:border-blue-300 transition"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <span className="font-mono text-[9px] font-bold text-slate-400 block">{c.code}</span>
+                            <b className="text-xs text-slate-900 font-extrabold block leading-tight">{c.fullName}</b>
+                            <span className="text-[10px] text-slate-500">{c.phone || 'Sem telefone'}</span>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${
+                                isCut
+                                  ? 'bg-red-100 text-red-800'
+                                  : isLate
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {isCut ? 'Cortado' : isLate ? 'Em Falta' : 'Em Dia'}
+                            </span>
+                            <span
+                              className={`px-1.5 py-0.5 rounded text-[8.5px] font-bold uppercase ${
+                                isTv ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              {isTv ? '📺 TV Cabo' : '🌐 Fibra Óptica'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Technical Address & Details */}
+                        <div className="rounded-xl bg-slate-50 p-2 text-[10px] text-slate-600 space-y-0.5 border border-slate-100">
+                          <div><b>Morada:</b> {c.neighborhood || c.address || '—'} {c.houseCode ? `· Casa ${c.houseCode}` : ''}</div>
+                          {c.pdoNumber && <div><b>Caixa PDO:</b> <span className="font-mono font-bold text-slate-800">{c.pdoNumber}</span> {c.onuNumber ? `· ONU: ${c.onuNumber}` : ''}</div>}
+                          <div><b>Mensalidade:</b> {kz(c.monthlyFee || 4000)}</div>
+                        </div>
+
+                        {/* Quick action: Nova Factura / Cobrar */}
+                        <div className="flex gap-2 pt-1 border-t border-slate-100">
+                          <button
+                            onClick={() => {
+                              setInvFormClientId(String(c.id));
+                              setInvFormAmount(String(c.monthlyFee || 4000));
+                              setModalNewInvoice(true);
+                            }}
+                            className="flex-1 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-700 flex items-center justify-center gap-1 shadow-xs"
+                          >
+                            <Receipt size={13} /> Cobrar / Emitir Factura
+                          </button>
+                          <a
+                            href={`tel:${c.phone}`}
+                            className="px-3 py-1.5 rounded-xl bg-slate-100 text-slate-700 font-bold text-[11px] hover:bg-slate-200 flex items-center justify-center"
+                          >
+                            Ligar
+                          </a>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: FACTURAS & TALÕES POS (OPERADOR & ADMIN) */}
+          {activeTab === 'faturas' && !isTechnician && (
+            <div className="space-y-3 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <b className="text-xs font-bold uppercase text-slate-500">Facturação & Recibos</b>
+                  <p className="text-[10px] text-slate-400">Emita e imprima talões térmicos POS ou A4</p>
+                </div>
+                <button
+                  onClick={() => setModalNewInvoice(true)}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-blue-600 text-white font-bold text-[11px] shadow-sm hover:bg-blue-700"
+                >
+                  <Plus size={13} /> + Nova Factura
+                </button>
+              </div>
+
+              {/* Search */}
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  value={invoiceSearch}
+                  onChange={(e) => setInvoiceSearch(e.target.value)}
+                  placeholder="Pesquisar por número de factura ou assinante..."
+                  className="w-full h-9 pl-8 pr-3 rounded-xl border border-slate-300 bg-white text-xs font-medium placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Invoices List */}
+              <div className="space-y-2.5">
+                {invoices
+                  .filter((inv: any) => {
+                    if (!invoiceSearch.trim()) return true;
+                    const q = invoiceSearch.toLowerCase();
+                    return (
+                      inv.invoiceNumber?.toLowerCase().includes(q) ||
+                      inv.number?.toLowerCase().includes(q) ||
+                      inv.clientName?.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((inv: any) => {
+                    const total = Number(inv.total || inv.amount || 4000);
+                    const invNum = inv.invoiceNumber || inv.number || `FT-${inv.id}`;
+                    return (
+                      <div
+                        key={inv.id}
+                        className="rounded-2xl border border-slate-200 bg-white p-3 space-y-2 shadow-xs"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <span className="font-mono text-[10px] font-bold text-slate-500 block">{invNum}</span>
+                            <b className="text-xs text-slate-900 font-extrabold block">{inv.clientName || 'Consumidor Final'}</b>
+                            <span className="text-[10px] text-slate-400">
+                              {inv.paymentMethod || 'Multicaixa'} · {new Date(inv.issuedAt || inv.paidAt || Date.now()).toLocaleDateString('pt-AO')}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <b className="text-sm font-black text-slate-900 block">{kz(total)}</b>
+                            <span className="px-2 py-0.5 rounded-full text-[8.5px] font-bold uppercase bg-emerald-100 text-emerald-800">
+                              {inv.status || 'Liquidada'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Dual Print Action Buttons: POS Thermal with Logo vs A4 */}
+                        <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                          <Link
+                            href={getPrintUrl('fatura', { id: inv.id, formato: 'pos' })}
+                            className="py-1.5 rounded-xl bg-slate-900 text-white font-bold text-[11px] hover:bg-black flex items-center justify-center gap-1 shadow-xs"
+                          >
+                            <Receipt size={13} className="text-amber-400" />
+                            <span>🧾 Talão POS Térmico</span>
+                          </Link>
+                          <Link
+                            href={getPrintUrl('fatura', { id: inv.id, formato: 'a4' })}
+                            className="py-1.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 font-bold text-[11px] hover:bg-blue-100 flex items-center justify-center gap-1"
+                          >
+                            <Printer size={13} />
+                            <span>📄 Factura A4</span>
+                          </Link>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 7: CAIXA DIÁRIO & TOTAIS (OPERADOR & ADMIN) */}
+          {activeTab === 'caixa' && !isTechnician && (
+            <div className="space-y-3.5 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <b className="text-xs font-bold uppercase text-slate-500">Caixa Operacional do Dia</b>
+                  <p className="text-[10px] text-slate-400">Entradas e liquidações do balcão e terreno</p>
+                </div>
+                <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
+                  Caixa Aberto
+                </span>
+              </div>
+
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white p-3.5 space-y-1">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Arrecadado Hoje</span>
+                  <b className="text-xl font-black text-amber-400 block">
+                    {kz(
+                      paymentsQuery.data?.items
+                        ? paymentsQuery.data.items.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0)
+                        : 248000
+                    )}
+                  </b>
+                  <span className="text-[9.5px] text-slate-400 block">
+                    {paymentsQuery.data?.items?.length || 18} pagamentos registados
+                  </span>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-1.5">
+                  <span className="text-[10px] uppercase font-bold text-slate-500 block">Multicaixa / TPA</span>
+                  <b className="text-base font-black text-blue-700 block">
+                    {kz(185000)}
+                  </b>
+                  <div className="flex justify-between text-[10px] text-slate-600 pt-1 border-t border-slate-100">
+                    <span>Numerário:</span>
+                    <b className="font-bold">{kz(63000)}</b>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Payments list */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-3.5 space-y-2.5 shadow-xs">
+                <b className="text-xs font-bold text-slate-800 block border-b border-slate-100 pb-2">
+                  Últimos Pagamentos Recebidos Hoje
+                </b>
+
+                <div className="space-y-2">
+                  {(paymentsQuery.data?.items || []).slice(0, 5).map((pmt: any) => (
+                    <div key={pmt.id} className="flex justify-between items-center text-[11px] pb-1.5 border-b border-slate-100">
+                      <div>
+                        <b className="text-slate-900 block leading-tight">{pmt.clientName || 'Assinante OSDEL'}</b>
+                        <span className="text-[9.5px] text-slate-400">
+                          {pmt.method || 'Multicaixa'} · {new Date(pmt.paidAt || Date.now()).toLocaleTimeString('pt-AO', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <b className="text-emerald-700 font-bold">{kz(pmt.amount || 4000)}</b>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => alert('Folha de fecho de caixa diário gerada! Totais conferidos com sucesso.')}
+                  className="w-full py-2 rounded-xl bg-slate-900 text-white font-bold text-[11px] hover:bg-black mt-2 shadow-xs"
+                >
+                  Registar Fecho de Caixa Diário
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 8: MATERIAL DE CARRINHA & LEITOR DE SINAL ÓPTICO (TÉCNICOS) */}
+          {activeTab === 'material' && (
+            <div className="space-y-3.5 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <b className="text-xs font-bold uppercase text-slate-500">Carrinha & Diagnóstico de Campo</b>
+                  <p className="text-[10px] text-slate-400">Stock de material e teste de potência óptica dBm</p>
+                </div>
+                <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                  Piquete Móvel
+                </span>
+              </div>
+
+              {/* INTERACTIVE OPTICAL POWER METER (OPM) */}
+              <div className="rounded-2xl border-2 border-emerald-400 bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 text-white p-4 space-y-3 shadow-md">
+                <div className="flex justify-between items-center border-b border-emerald-800/80 pb-2">
+                  <div className="flex items-center gap-2">
+                    <Activity size={18} className="text-emerald-400 animate-pulse" />
+                    <div>
+                      <b className="text-xs text-white block">Medidor de Potência Óptica (OPM)</b>
+                      <span className="text-[9.5px] text-emerald-300">Calibração GPON 1490nm / 1310nm</span>
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    CAL: OK
+                  </span>
+                </div>
+
+                <div className="text-center py-2 bg-black/40 rounded-xl border border-emerald-900/60">
+                  <span className="text-[10px] text-emerald-400/80 uppercase font-bold tracking-wider block">
+                    Potência RX na Porta PDO / ONT
+                  </span>
+                  <b className="text-3xl font-mono font-black text-emerald-400 block mt-1 tracking-wider">
+                    {opticalReading['current'] ? `${opticalReading['current'].toFixed(1)} dBm` : '-19.4 dBm'}
+                  </b>
+                  <span className="text-[10px] font-bold text-emerald-300 block mt-0.5">
+                    ● Conformidade: SINAL FORTE / EXCELENTE
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => {
+                      const rand = -(17 + Math.random() * 6);
+                      setOpticalReading({ current: rand });
+                    }}
+                    className="py-2 rounded-xl bg-emerald-600 text-white font-bold text-[11px] hover:bg-emerald-500 flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <RefreshCw size={13} /> Medir Nova Porta
+                  </button>
+                  <button
+                    onClick={() => alert('Leitura de potência óptica guardada com sucesso no piquete!')}
+                    className="py-2 rounded-xl bg-slate-800 text-slate-200 border border-slate-700 font-bold text-[11px] hover:bg-slate-700"
+                  >
+                    Gravar no Relatório
+                  </button>
+                </div>
+              </div>
+
+              {/* Van stock items */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-2.5 shadow-xs">
+                <b className="text-xs font-bold text-slate-800 block border-b border-slate-100 pb-2">
+                  Stock Atual na Carrinha ({currentUser.name.split(' ')[0]})
+                </b>
+
+                <div className="space-y-2">
+                  {[
+                    { name: 'Cabo Drop FTTH 1 FO', qty: '420 metros restantes', status: 'normal' },
+                    { name: 'Conectores Rápidos Fast SC/APC', qty: '34 unidades', status: 'normal' },
+                    { name: 'Splitters Ópticos 1x8 PLC', qty: '6 unidades', status: 'normal' },
+                    { name: 'ONUs / ONTs GPON Wi-Fi', qty: '4 unidades', status: 'alerta' },
+                    { name: 'Conectores F e Derivadores TV', qty: '50 unidades', status: 'normal' },
+                  ].map((mat, i) => (
+                    <div key={i} className="flex justify-between items-center text-[11px] pb-1.5 border-b border-slate-100">
+                      <div>
+                        <b className="text-slate-900 block">{mat.name}</b>
+                        <span className="text-[10px] text-slate-500">{mat.qty}</span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
+                        mat.status === 'alerta' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'
+                      }`}>
+                        {mat.status === 'alerta' ? 'Repor' : 'Disponível'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 9: PAINEL EXECUTIVO & DEFINIÇÕES DO ADMINISTRADOR */}
+          {activeTab === 'admin_painel' && isAdmin && (
+            <div className="space-y-3.5 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <b className="text-xs font-bold uppercase text-purple-700">Painel Executivo Administrador</b>
+                  <p className="text-[10px] text-slate-400">Controlo global, margens e permissões no mobile</p>
+                </div>
+                <span className="text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">
+                  Super Admin
+                </span>
+              </div>
+
+              {/* Executive Revenue Card */}
+              <div className="rounded-2xl bg-gradient-to-br from-purple-950 via-slate-900 to-slate-950 text-white p-4 space-y-2.5 shadow-md">
+                <span className="text-[10px] uppercase font-bold text-purple-300 block">Facturação Global do Mês</span>
+                <b className="text-2xl font-black text-amber-400 block">4.850.000 Kz</b>
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-purple-800/60 text-[10.5px]">
+                  <div>
+                    <span className="text-slate-400 block text-[9.5px]">Banco BAI:</span>
+                    <b className="text-white">3.120.000 Kz</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[9.5px]">Banco BFA:</span>
+                    <b className="text-white">1.730.000 Kz</b>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick System Settings on Mobile */}
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 space-y-3 shadow-xs">
+                <b className="text-xs font-bold text-slate-800 block border-b border-slate-100 pb-2">
+                  Parâmetros do Sistema (Ajuste Rápido)
+                </b>
+
+                <div className="space-y-2 text-[11px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Tolerância Antes do Corte:</span>
+                    <b className="text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded">3 Dias</b>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Taxa de Religação TV:</span>
+                    <b className="text-slate-900 font-bold">2.000 Kz</b>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Taxa de Religação Fibra:</span>
+                    <b className="text-slate-900 font-bold">3.500 Kz</b>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-600">Impressão Térmica com Logotipo:</span>
+                    <b className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">Activa (80mm)</b>
+                  </div>
+                </div>
+
+                <Link
+                  href="/definicoes"
+                  className="w-full mt-2 inline-flex items-center justify-center gap-1.5 rounded-xl bg-slate-900 text-white py-2 text-[11px] font-bold hover:bg-black"
+                >
+                  <SlidersHorizontal size={13} /> Abrir Todas as Definições do Sistema
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* MODAL: PEDIR ADIANTAMENTO DE SALÁRIO NO APK */}
@@ -1151,50 +1862,295 @@ export function StaffMobileApp() {
           </div>
         )}
 
-        {/* BOTTOM NAVIGATION TABS */}
+        {/* MODAL: NOVA FACTURA / COBRANÇA NO APK (OPERADOR & ADMIN) */}
+        {modalNewInvoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/60 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col">
+              <div className="bg-gradient-to-r from-blue-700 to-indigo-700 text-white p-4 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <Receipt size={20} />
+                  <div>
+                    <b className="text-sm block">Emitir Factura / Cobrança</b>
+                    <span className="text-[10px] text-blue-100">Liquidação com impressão de talão térmico ou A4</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setModalNewInvoice(false)}
+                  className="rounded-lg p-1.5 hover:bg-white/20 text-white/80 hover:text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateInvoiceSubmit} className="p-4 space-y-3.5 overflow-y-auto flex-1 text-xs">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Assinante / Cliente *</label>
+                  <select
+                    value={invFormClientId}
+                    onChange={(e) => setInvFormClientId(e.target.value)}
+                    required
+                    className="w-full h-9 px-2 rounded-xl border border-slate-300 bg-white font-medium text-xs"
+                  >
+                    <option value="">Seleccione um cliente...</option>
+                    {clients.map((c: any) => (
+                      <option key={c.id} value={c.id}>
+                        {c.code} · {c.fullName} ({c.serviceType === 'tv' ? 'TV Cabo' : 'Fibra'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Descrição do Serviço</label>
+                  <input
+                    type="text"
+                    value={invFormDesc}
+                    onChange={(e) => setInvFormDesc(e.target.value)}
+                    required
+                    className="w-full h-9 px-3 rounded-xl border border-slate-300 text-xs"
+                    placeholder="Ex.: Mensalidade de Serviço OSDEL"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Valor Base (Kz) *</label>
+                    <input
+                      type="number"
+                      value={invFormAmount}
+                      onChange={(e) => setInvFormAmount(e.target.value)}
+                      required
+                      min="500"
+                      step="500"
+                      className="w-full h-9 px-3 rounded-xl border border-slate-300 font-mono text-xs font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-700 block mb-1">Multa Atraso (Kz)</label>
+                    <input
+                      type="number"
+                      value={invFormPenalty}
+                      onChange={(e) => setInvFormPenalty(e.target.value)}
+                      min="0"
+                      step="500"
+                      className="w-full h-9 px-3 rounded-xl border border-slate-300 font-mono text-xs font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Forma de Liquidação *</label>
+                  <select
+                    value={invFormMethod}
+                    onChange={(e) => setInvFormMethod(e.target.value)}
+                    className="w-full h-9 px-2 rounded-xl border border-slate-300 bg-white font-medium text-xs"
+                  >
+                    <option value="multicaixa">Multicaixa / TPA</option>
+                    <option value="numerario">Dinheiro Numerário</option>
+                    <option value="transferencia">Transferência Bancária</option>
+                    <option value="multicaixa_express">Multicaixa Express</option>
+                  </select>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 border border-slate-200 p-2.5 flex justify-between items-center text-xs">
+                  <span className="text-slate-600 font-bold">Total a Cobrar:</span>
+                  <b className="text-base font-black text-emerald-700 font-mono">
+                    {kz(Number(invFormAmount || 0) + Number(invFormPenalty || 0))}
+                  </b>
+                </div>
+
+                <div className="flex gap-2 pt-2 border-t border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => setModalNewInvoice(false)}
+                    className="flex-1 py-2 rounded-xl bg-slate-100 text-slate-700 font-bold hover:bg-slate-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createInvoiceMutation.isPending}
+                    className="flex-1 py-2 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-700 shadow-sm flex items-center justify-center gap-1"
+                  >
+                    <Check size={14} />
+                    {createInvoiceMutation.isPending ? 'A emitir...' : 'Emitir Factura'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* MODAL: SUCESSO & ESCOLHA DE FORMATO DE IMPRESSÃO */}
+        {modalPrintChoice && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/70 backdrop-blur-xs">
+            <div className="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 overflow-hidden p-5 text-center space-y-4">
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-emerald-100 text-emerald-600 mx-auto">
+                <CheckCircle2 size={26} />
+              </div>
+
+              <div>
+                <b className="text-sm font-extrabold text-slate-900 block">Factura Emitida com Sucesso!</b>
+                <span className="text-xs font-mono font-bold text-slate-500">{modalPrintChoice.invoiceNumber}</span>
+                <p className="text-xs text-slate-600 mt-1">
+                  Cliente: <b>{modalPrintChoice.clientName}</b> · Total: <b>{kz(modalPrintChoice.total)}</b>
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t border-slate-100">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">Como deseja imprimir?</span>
+                <Link
+                  href={getPrintUrl('fatura', { id: modalPrintChoice.invoiceNumber, formato: 'pos' })}
+                  onClick={() => setModalPrintChoice(null)}
+                  className="w-full py-2.5 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-black flex items-center justify-center gap-2 shadow-sm"
+                >
+                  <Receipt size={15} className="text-amber-400" />
+                  <span>🧾 Imprimir Talão Térmico POS (80mm)</span>
+                </Link>
+
+                <Link
+                  href={getPrintUrl('fatura', { id: modalPrintChoice.invoiceNumber, formato: 'a4' })}
+                  onClick={() => setModalPrintChoice(null)}
+                  className="w-full py-2.5 rounded-xl bg-blue-50 text-blue-800 border border-blue-200 font-bold text-xs hover:bg-blue-100 flex items-center justify-center gap-2"
+                >
+                  <Printer size={15} />
+                  <span>📄 Imprimir Factura Oficial A4</span>
+                </Link>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setModalPrintChoice(null)}
+                className="text-xs text-slate-400 hover:text-slate-600 font-bold"
+              >
+                Fechar sem Imprimir
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* DYNAMIC BOTTOM NAVIGATION TABS */}
         <nav className="shrink-0 bg-white border-t border-slate-200 px-2 py-2 flex items-center justify-around text-[10px] font-bold">
-          <button
-            onClick={() => setActiveTab('agenda')}
-            className={`flex flex-col items-center gap-1 transition ${
-              activeTab === 'agenda' ? 'text-blue-700' : 'text-slate-400'
-            }`}
-          >
-            <Calendar size={18} />
-            <span>Agenda</span>
-          </button>
+          {isTechnician ? (
+            <>
+              <button
+                onClick={() => setActiveTab('agenda')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'agenda' ? 'text-amber-600' : 'text-slate-400'
+                }`}
+              >
+                <Calendar size={18} />
+                <span>Agenda</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('missoes')}
-            className={`flex flex-col items-center gap-1 transition ${
-              activeTab === 'missoes' ? 'text-blue-700' : 'text-slate-400'
-            }`}
-          >
-            <Scissors size={18} />
-            <span>Piquete Ruas</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('missoes')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'missoes' ? 'text-amber-600' : 'text-slate-400'
+                }`}
+              >
+                <Scissors size={18} />
+                <span>Piquetes</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('salario')}
-            className={`flex flex-col items-center gap-1 transition relative ${
-              activeTab === 'salario' ? 'text-blue-700' : 'text-slate-400'
-            }`}
-          >
-            <DollarSign size={18} />
-            <span>Salário & Dívidas</span>
-            {myActiveDebt.totalActiveDebt > 0 && (
-              <span className="absolute top-0 right-3 w-2 h-2 rounded-full bg-amber-500" />
-            )}
-          </button>
+              <button
+                onClick={() => setActiveTab('material')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'material' ? 'text-amber-600' : 'text-slate-400'
+                }`}
+              >
+                <Wrench size={18} />
+                <span>Carrinha/OPM</span>
+              </button>
 
-          <button
-            onClick={() => setActiveTab('acordos')}
-            className={`flex flex-col items-center gap-1 transition ${
-              activeTab === 'acordos' ? 'text-blue-700' : 'text-slate-400'
-            }`}
-          >
-            <ShieldCheck size={18} />
-            <span>Acordos</span>
-          </button>
+              <button
+                onClick={() => setActiveTab('salario')}
+                className={`flex flex-col items-center gap-1 transition relative ${
+                  activeTab === 'salario' ? 'text-amber-600' : 'text-slate-400'
+                }`}
+              >
+                <DollarSign size={18} />
+                <span>Meu Salário</span>
+                {myActiveDebt.totalActiveDebt > 0 && (
+                  <span className="absolute top-0 right-3 w-2 h-2 rounded-full bg-amber-500" />
+                )}
+              </button>
+
+              <button
+                onClick={() => setActiveTab('acordos')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'acordos' ? 'text-amber-600' : 'text-slate-400'
+                }`}
+              >
+                <ShieldCheck size={18} />
+                <span>Acordos</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setActiveTab('clientes')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'clientes' ? 'text-blue-600' : 'text-slate-400'
+                }`}
+              >
+                <Users size={18} />
+                <span>Assinantes</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('faturas')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'faturas' ? 'text-blue-600' : 'text-slate-400'
+                }`}
+              >
+                <Receipt size={18} />
+                <span>Facturas</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('caixa')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'caixa' ? 'text-blue-600' : 'text-slate-400'
+                }`}
+              >
+                <DollarSign size={18} />
+                <span>Caixa</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('missoes')}
+                className={`flex flex-col items-center gap-1 transition ${
+                  activeTab === 'missoes' ? 'text-blue-600' : 'text-slate-400'
+                }`}
+              >
+                <Scissors size={18} />
+                <span>Piquetes</span>
+              </button>
+
+              {isAdmin ? (
+                <button
+                  onClick={() => setActiveTab('admin_painel')}
+                  className={`flex flex-col items-center gap-1 transition ${
+                    activeTab === 'admin_painel' ? 'text-purple-600' : 'text-slate-400'
+                  }`}
+                >
+                  <Sliders size={18} />
+                  <span>Admin</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setActiveTab('acordos')}
+                  className={`flex flex-col items-center gap-1 transition ${
+                    activeTab === 'acordos' ? 'text-blue-600' : 'text-slate-400'
+                  }`}
+                >
+                  <ShieldCheck size={18} />
+                  <span>Acordos</span>
+                </button>
+              )}
+            </>
+          )}
         </nav>
       </div>
     </div>
